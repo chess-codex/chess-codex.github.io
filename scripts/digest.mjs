@@ -233,7 +233,13 @@ for (let k = 0; k < drafts.length; k += 3) {
   const checks = await verifyChunk(chunk);
   chunk.forEach((c, n) => {
     const ck = checks.find((x) => Number(x.i) === n);
-    const overlap = verified.find((v) => c.itemIds.filter((id) => v.itemIds.includes(id)).length * 2 >= c.itemIds.length);
+    // repetida = metade das fontes iguais, ou mesmo título original (comunicado republicado por outro site)
+    const origTitle = (id) => byId.get(id).title.toLowerCase().slice(0, 60);
+    const overlap = verified.find(
+      (v) =>
+        c.itemIds.filter((id) => v.itemIds.includes(id)).length * 2 >= c.itemIds.length ||
+        c.itemIds.some((id) => v.itemIds.some((vid) => origTitle(vid) === origTitle(id))),
+    );
     if (overlap) return console.log(`  repetida (mesmas fontes de "${overlap.title}"): ${c.title}`);
     if (ck?.title !== true) return console.log(`  descartada: ${c.title}`);
     // um resumo por fonte (a primeira notícia de cada fonte), com o nome dela
