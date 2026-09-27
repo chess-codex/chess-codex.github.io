@@ -97,6 +97,9 @@ const GLOSSARY = `Glossário de xadrez (obrigatório):
 - "swindle" = virada de partida perdida; "Titled Tuesday" é um torneio online semanal; "norm" = norma de título (GM, IM, WGM).
 - Brancas (white) e pretas (black) nunca podem ser trocadas.`;
 
+// palavras de resultado que não podem aparecer no rótulo pequeno da história
+const RESULT_WORDS = /(ouro|prata|bronze|medalh\w*|venc\w*|derrot\w*|campe\w*|vitória|empat\w*|lidera\w*|elimina\w*|gold|silver|win\w*|beat\w*)|\d\s*[,.½]?\s*[-–x]\s*\d/i;
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const errText = (e) => String(e?.message ?? e);
 const used = new Set();
@@ -383,7 +386,7 @@ const CLUSTER_PROMPT = `Você é editor-chefe de uma gazeta de xadrez em PT-BR.
 Recebe notícias (id, f = fonte, c = categoria, m = manchete, r = resumo). Agrupe as que falam do MESMO fato e escolha as 7 pautas mais relevantes, da mais importante para a menos.
 - Priorize fatos cobertos por mais fontes e por redações e entidades oficiais (chesscom, chesscom-pt, fide, chessbase, lichess, feda, ecu, fmx, fexpar, damasyreyes). Evite recapitulações de rodadas antigas se houver notícia mais nova do mesmo evento.
 - No máximo 3 pautas sobre o mesmo evento. Se houver jogadores, ciência, cultura, plataformas ou polêmica, pelo menos 3 pautas desses assuntos (pauta de fonte única vale).
-Para cada pauta devolva: itemIds; kicker (rótulo curto, ex.: "Olimpíada · Rodada 9"); tag (Torneios, Jogadores, Plataformas ou Bastidores); title (manchete em PT, até 70 caracteres, usando só o que está nas manchetes e resumos, sem acrescentar nacionalidade, idade, número ou adjetivo que não esteja lá); spoiler (true se o title revela resultado); safeTitle (manchete sem o resultado).
+Para cada pauta devolva: itemIds; kicker (rótulo curto só com o evento ou assunto, ex.: "Olimpíada · Rodada 9", "FIDE", "Jogadores"; NUNCA resultado, medalha, placar ou vencedor); tag (Torneios, Jogadores, Plataformas ou Bastidores); title (manchete em PT, até 70 caracteres, usando só o que está nas manchetes e resumos, sem acrescentar nacionalidade, idade, número ou adjetivo que não esteja lá); spoiler (true se o title revela resultado); safeTitle (manchete sem o resultado).
 Devolva JSON {"stories":[...]}.
 ${GLOSSARY}`;
 
@@ -488,7 +491,8 @@ function acceptDraft(c, ck) {
   if (safe && ck.safeTitle !== true) console.log(`  manchete segura sem base ou com o resultado, fica o véu: ${safe}`);
   verified.push({
     itemIds: ids,
-    kicker: ck.kicker === true && c.kicker ? c.kicker : c.tag,
+    // rótulo é só o assunto: se trouxer resultado ou medalha (fato que pode estar errado), vira a editoria
+    kicker: ck.kicker === true && c.kicker && !RESULT_WORDS.test(c.kicker) ? c.kicker : c.tag,
     title: c.title,
     // igual ao título = sem manchete segura: no Anti-Spoiler o app mostra o véu
     safeTitle: safe && ck.safeTitle === true ? safe : c.title,
@@ -555,7 +559,8 @@ const stories = verified.length
       .filter((s) => s.itemIds.length)
       .map((s) => {
         const tag = TAGS.includes(s.tag) ? s.tag : 'Bastidores';
-        return { ...s, tag, title: str(s.title), kicker: str(s.kicker) || tag, safeTitle: str(s.safeTitle) || str(s.title) };
+        const kicker = str(s.kicker);
+        return { ...s, tag, title: str(s.title), kicker: kicker && !RESULT_WORDS.test(kicker) ? kicker : tag, safeTitle: str(s.safeTitle) || str(s.title) };
       });
 
 // liga cada história à partida de que ela fala (jogadores ou seleções citados nas fontes)
