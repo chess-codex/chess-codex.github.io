@@ -257,10 +257,15 @@ export function linkGame(text, games, topSurnames = []) {
   const known = new Set([...games.flatMap((g) => [g.whiteSurname, g.blackSurname]), ...topSurnames].filter((n) => n && n.length >= 4).map((n) => n.toLowerCase()));
   const mentioned = [...known].filter(has);
   // "9ª rodada", "rodada 9", "round 9", "R9": a partida tem que ser dessa rodada
-  const rm = text.match(/(?:rodada|round)\s*(\d{1,2})\b|\b(\d{1,2})\s*[ªºa]?\s*rodada|\bR(\d{1,2})\b/i);
-  const roundCited = rm ? Number(rm[1] ?? rm[2] ?? rm[3]) : null;
+  // várias rodadas citadas (ex.: "R9" e "Rounds 10–11") = qualquer uma delas vale
+  const rounds = new Set();
+  for (const m of text.matchAll(/(?:rodadas?|rounds?)\s*(\d{1,2})(?:\s*[–-]\s*(\d{1,2}))?|\b(\d{1,2})\s*[ªºa]?\s*rodada|\bR(\d{1,2})\b/gi)) {
+    const a = Number(m[1] ?? m[3] ?? m[4]);
+    const b = m[2] ? Number(m[2]) : a;
+    for (let n = a; n <= b && n - a < 12; n++) rounds.add(n);
+  }
   const level = (g) => {
-    if (roundCited != null && Number(String(g.round).match(/\d+/)?.[0]) !== roundCited) return 0;
+    if (rounds.size && !rounds.has(Number(String(g.round).match(/\d+/)?.[0]))) return 0;
     const w = g.whiteSurname.length >= 4 && has(g.whiteSurname);
     const b = g.blackSurname.length >= 4 && has(g.blackSurname);
     if (w && b) return 4;
