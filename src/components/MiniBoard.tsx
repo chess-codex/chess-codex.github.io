@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { fmtEval, gameStory, keyCaption, keyTitle, moveLabel, puzzlePly, resultLabel, sideName, winnerName, type Ending, type Game } from '@/lib/games';
+import { fig, fmtEval, gameStory, keyCaption, keyTitle, moveLabel, puzzlePly, resultLabel, sideName, winnerName, type Ending, type Game } from '@/lib/games';
 import { useStore } from '@/lib/store';
 import { font, radius, usePalette } from '@/lib/theme';
 import { Board } from './Board';
@@ -85,7 +85,7 @@ export function MiniBoard({ game, ply, caption, showLink = true }: { game: Game;
       setCur(cur + 1);
     } else {
       setTries((t) => t + 1);
-      setFeedback(`${san.replace(/[KQRBN]/g, (m) => ({ K: 'R', Q: 'D', R: 'T', B: 'B', N: 'C' })[m] as string)} não foi o lance da partida. Tente de novo.`);
+      setFeedback(`${fig(san)} não foi o lance da partida. Tente de novo.`);
     }
   };
 

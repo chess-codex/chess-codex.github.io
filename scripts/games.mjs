@@ -4,7 +4,8 @@
 import { Chess } from 'chess.js';
 
 const UA = { 'User-Agent': 'Mozilla/5.0 ChessCodexNews/0.1' };
-const HOURS = 36; // rodadas que começaram nas últimas 36 horas
+const HOURS = 72; // partidas das últimas 72h servem para ligar às notícias
+const FEATURED_HOURS = 36; // "Partidas do dia" mostra só as últimas 36h
 const MATE = 20;
 
 async function json(url) {
@@ -21,12 +22,20 @@ async function text(url) {
 
 const EASTERN = /China|Chinese|Korea|Vietnam|Taipei/i;
 const person = (raw, team = '') => {
-  // "Abdusattorov, Nodirbek" → "Nodirbek Abdusattorov"; China/Coreia/Vietnã: "Ding Liren"; "Gukesh D" fica igual
+  // "Abdusattorov, Nodirbek" → "Nodirbek Abdusattorov"; China/Coreia/Vietnã: "Ding Liren"
+  // sem vírgula: "Erigaisi Arjun" → "Arjun Erigaisi"; "Gukesh D" e "Praggnanandhaa R" ficam iguais
   const [last, first] = raw.split(',').map((s) => s.trim());
-  if (!first) return last;
+  if (!first) {
+    const parts = last.split(/\s+/);
+    return parts.length === 2 && parts[1].length > 1 && !EASTERN.test(team) ? `${parts[1]} ${parts[0]}` : last;
+  }
   return EASTERN.test(team) ? `${last} ${first}` : `${first} ${last}`;
 };
-const surname = (raw) => raw.split(',')[0].trim().replace(/ [A-Z]$/, '');
+const surname = (raw) => {
+  const [last, first] = raw.split(',').map((s) => s.trim());
+  // sem vírgula, o sobrenome vem primeiro ("Erigaisi Arjun", "Gukesh D")
+  return first ? last : last.split(/\s+/)[0];
+};
 
 function clockSeconds(c) {
   const [h, m, s] = c.split(':').map(Number);
@@ -181,7 +190,7 @@ export async function fetchRecentGames({ topSurnames = [], limit = 16 } = {}) {
       for (const r of tinfo.rounds ?? []) {
         if ((r.startsAt ?? 0) >= since && (r.finished || r.ongoing)) {
           const round = r.name.replace(/^Round\b/i, 'Rodada').replace(/^Game\b/i, 'Partida').replace(/\bFinals?\b/i, 'Final');
-          rounds.push({ id: r.id, event: sectionPt ? `${event} · ${sectionPt}` : event, round });
+          rounds.push({ id: r.id, event: sectionPt ? `${event} · ${sectionPt}` : event, round, startsAt: r.startsAt });
         }
       }
     }
@@ -193,6 +202,7 @@ export async function fetchRecentGames({ topSurnames = [], limit = 16 } = {}) {
       const pgn = await text(`https://lichess.org/api/broadcast/round/${r.id}.pgn`);
       for (const raw of pgn.split(/\n\n(?=\[Event )/)) {
         const g = analyzeGame(raw, { event: r.event, round: r.round });
+        if (g) g.startsAt = r.startsAt;
         if (g && Math.max(g.whiteElo, g.blackElo) >= 2450) games.push(g);
       }
     } catch (e) {
@@ -200,18 +210,19 @@ export async function fetchRecentGames({ topSurnames = [], limit = 16 } = {}) {
     }
   }
   const unique = [...new Map(games.map((g) => [g.key, g])).values()];
+  const recentCut = Date.now() - FEATURED_HOURS * 3600 * 1000;
   unique.sort((a, b) => gameScore(b, topSurnames) - gameScore(a, topSurnames));
   // variedade: as 4 melhores de cada seção/evento primeiro (ex.: feminino não some atrás do aberto)
   const picked = [];
   const perEvent = new Map();
-  for (const g of unique) {
+  for (const g of unique.filter((x) => x.startsAt >= recentCut)) {
     const n = perEvent.get(g.event) ?? 0;
     if (n < 4) {
       picked.push(g);
       perEvent.set(g.event, n + 1);
     }
   }
-  for (const g of unique) if (picked.length < limit && !picked.includes(g)) picked.push(g);
+  for (const g of unique) if (picked.length < limit && !picked.includes(g) && g.startsAt >= recentCut) picked.push(g);
   picked.sort((a, b) => gameScore(b, topSurnames) - gameScore(a, topSurnames));
   console.log(`partidas: ${rounds.length} rodadas, ${games.length} jogos analisados, ${Math.min(limit, picked.length)} escolhidos`);
   return { featured: picked.slice(0, limit), all: unique };
@@ -242,11 +253,21 @@ export function linkGame(text, games, topSurnames = []) {
   const team = (t) => (t ? (TEAM_ALIASES[t] ?? [t]).some(has) : false);
   // citar um jogador só liga a partida se a notícia fala de jogo (um homenageado num prêmio, por exemplo, não)
   const aboutPlay = /\b(beats?|defeat\w*|won|wins?|draws?|drew|game|round|swindl\w*|clinch\w*|hero|venc\w*|derrot\w*|empat\w*|partida|rodada|virada|vitória|ouro|gold)\b/i.test(text);
+  // jogadores conhecidos citados na notícia (das partidas analisadas e do Top 10)
+  const known = new Set([...games.flatMap((g) => [g.whiteSurname, g.blackSurname]), ...topSurnames].filter((n) => n && n.length >= 4).map((n) => n.toLowerCase()));
+  const mentioned = [...known].filter(has);
+  // "9ª rodada", "rodada 9", "round 9", "R9": a partida tem que ser dessa rodada
+  const rm = text.match(/(?:rodada|round)\s*(\d{1,2})\b|\b(\d{1,2})\s*[ªºa]?\s*rodada|\bR(\d{1,2})\b/i);
+  const roundCited = rm ? Number(rm[1] ?? rm[2] ?? rm[3]) : null;
   const level = (g) => {
+    if (roundCited != null && Number(String(g.round).match(/\d+/)?.[0]) !== roundCited) return 0;
     const w = g.whiteSurname.length >= 4 && has(g.whiteSurname);
     const b = g.blackSurname.length >= 4 && has(g.blackSurname);
     if (w && b) return 4;
     if (!aboutPlay) return 0;
+    // a notícia cita outro jogador que não está nesta partida: é outro jogo
+    const players = [g.whiteSurname.toLowerCase(), g.blackSurname.toLowerCase()];
+    if (mentioned.some((n) => !players.includes(n))) return 0;
     if (w || b) return 3;
     const tw = team(g.whiteTeam);
     const tb = team(g.blackTeam);

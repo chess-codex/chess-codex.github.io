@@ -116,13 +116,14 @@ export function useGame(key?: string): Game | undefined {
   return useMemo(() => (key ? games.find((g) => g.key === key) ?? (LEGACY[key] ? localize(LEGACY[key]) : undefined) : undefined), [games, key]);
 }
 
-// SAN inglês → notação em português (R rei, D dama, T torre, B bispo, C cavalo)
-const PT: Record<string, string> = { K: 'R', Q: 'D', R: 'T', B: 'B', N: 'C' };
-export const pt = (san: string) => san.replace(/[KQRBN]/g, (m) => PT[m]);
+// Notação com figuras (♘f3, ♖xb3): universal, não depende do idioma.
+// U+FE0E pede a versão de texto do símbolo, para nenhum aparelho trocar por emoji.
+const FIG: Record<string, string> = { K: '♔︎', Q: '♕︎', R: '♖︎', B: '♗︎', N: '♘︎' };
+export const fig = (san: string) => san.replace(/[KQRBN]/g, (m) => FIG[m]);
 
-/** "40… Txb3" para o lance de índice `ply` (0 = primeiro lance das brancas). */
+/** "40… ♖xb3" para o lance de índice `ply` (0 = primeiro lance das brancas). */
 export function moveLabel(g: Game, ply: number) {
-  return `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '…'} ${pt(g.moves[ply])}`;
+  return `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? '.' : '…'} ${fig(g.moves[ply])}`;
 }
 
 export function fmtEval(e: number | undefined | null) {
