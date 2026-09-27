@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MiniBoard } from '@/components/MiniBoard';
+import { GameStory, MiniBoard } from '@/components/MiniBoard';
 import { SaveButton, SourceTag, SpoilerTitle, openExternal } from '@/components/ui';
 import { useArticles } from '@/lib/digest';
 import { useGame } from '@/lib/games';
@@ -65,7 +65,8 @@ export default function Story() {
 
         {game ? (
           <View style={{ gap: 10 }}>
-            <Text style={[styles.blockLabel, { color: c.whisky }]}>ANÁLISE CHESS CODEX · A PARTIDA</Text>
+            <Text style={[styles.blockLabel, { color: c.whisky }]}>ANÁLISE CHESS CODEX · A PARTIDA QUE DECIDIU</Text>
+            {a.game?.ply == null ? <GameStory game={game} /> : null}
             <MiniBoard game={game} ply={a.game?.ply} caption={a.game?.caption} />
           </View>
         ) : null}

@@ -1,6 +1,6 @@
 import { Chess } from 'chess.js';
 import { memo, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Line, Polygon, SvgXml } from 'react-native-svg';
 
 import { PIECES } from './pieces';
@@ -17,6 +17,8 @@ export const BOARD_THEMES: Record<BoardThemeId, { name: string; light: string; d
 const FILES = 'abcdefgh';
 const LAST_MOVE = 'rgba(155,199,0,0.41)';
 const ARROW = 'rgba(227,160,74,0.9)';
+const SELECTED = 'rgba(20,85,30,0.5)';
+const HINT = 'rgba(20,85,30,0.45)';
 
 type Sq = { from: string; to: string };
 
@@ -26,7 +28,14 @@ function center(sq: string, s: number) {
   return { x: f * s + s / 2, y: r * s + s / 2 };
 }
 
-export function Board({ fen, size, theme, last, arrow }: { fen: string; size: number; theme: BoardThemeId; last?: Sq | null; arrow?: Sq | null }) {
+/**
+ * Tabuleiro. Com `onSquare`, vira interativo: toque na peça e depois na casa de destino.
+ * `selected` destaca a casa escolhida e `targets` mostra os destinos legais.
+ */
+export function Board({ fen, size, theme, last, arrow, onSquare, selected, targets }: {
+  fen: string; size: number; theme: BoardThemeId; last?: Sq | null; arrow?: Sq | null;
+  onSquare?: (sq: string) => void; selected?: string | null; targets?: string[];
+}) {
   const t = BOARD_THEMES[theme];
   const s = Math.floor(size / 8);
   size = s * 8; // casas inteiras: evita quebra de linha por arredondamento no flexWrap
@@ -60,12 +69,26 @@ export function Board({ fen, size, theme, last, arrow }: { fen: string; size: nu
             const hl = last && (last.from === sq || last.to === sq);
             const coord = isDark ? t.light : t.dark;
             return (
-              <View key={sq} style={{ width: s, height: s, backgroundColor: isDark ? t.dark : t.light }}>
+              <Pressable
+                key={sq}
+                disabled={!onSquare}
+                onPress={() => onSquare?.(sq)}
+                accessibilityLabel={sq}
+                style={{ width: s, height: s, backgroundColor: isDark ? t.dark : t.light }}
+              >
                 {hl ? <View style={[StyleSheet.absoluteFill, { backgroundColor: LAST_MOVE }]} /> : null}
+                {selected === sq ? <View style={[StyleSheet.absoluteFill, { backgroundColor: SELECTED }]} /> : null}
                 {f === 0 ? <Text style={[styles.rank, { color: coord, fontSize: s * 0.24 }]}>{8 - r}</Text> : null}
                 {r === 7 ? <Text style={[styles.file, { color: coord, fontSize: s * 0.24 }]}>{FILES[f]}</Text> : null}
                 {p ? <Piece code={`${p.color}${p.type.toUpperCase()}`} s={s} /> : null}
-              </View>
+                {targets?.includes(sq) ? (
+                  p ? (
+                    <View style={[StyleSheet.absoluteFill, { borderWidth: s * 0.08, borderColor: HINT, borderRadius: s / 2 }]} />
+                  ) : (
+                    <View style={[styles.dot, { width: s * 0.3, height: s * 0.3, borderRadius: s * 0.15, left: s * 0.35, top: s * 0.35 }]} />
+                  )
+                ) : null}
+              </Pressable>
             );
           }),
         )}
@@ -84,4 +107,5 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   rank: { position: 'absolute', top: 1, left: 2, fontWeight: '700' },
   file: { position: 'absolute', bottom: 0, right: 3, fontWeight: '700' },
+  dot: { position: 'absolute', backgroundColor: HINT },
 });

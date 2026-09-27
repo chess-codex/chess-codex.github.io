@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MiniBoard } from '@/components/MiniBoard';
+import { GameStory, MiniBoard } from '@/components/MiniBoard';
 import { openExternal } from '@/components/ui';
 import { fmtClock, fmtEval, keyCaption, keyTitle, moveLabel, resultLabel, useGame } from '@/lib/games';
 import { useStore } from '@/lib/store';
@@ -15,6 +16,7 @@ export default function GameScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const game = useGame(key);
   const { settings } = useStore();
+  const [showMoves, setShowMoves] = useState(false);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -72,10 +74,19 @@ export default function GameScreen() {
           ))}
         </View>
 
+        <View style={{ gap: 8 }}>
+          <Text style={[styles.blockLabel, { color: c.whisky }]}>A PARTIDA EM TEXTO</Text>
+          <GameStory game={game} />
+        </View>
+
         <MiniBoard game={game} showLink={false} />
 
         <View style={[styles.block, { backgroundColor: c.surface, borderColor: c.hairline }]}>
-          <Text style={[styles.blockLabel, { color: c.muted }]}>LANCES</Text>
+          <Pressable onPress={() => setShowMoves((v) => !v)} style={styles.movesHead} hitSlop={8}>
+            <Text style={[styles.blockLabel, { color: c.muted }]}>TODOS OS LANCES</Text>
+            <Text style={[styles.toggle, { color: c.accent }]}>{showMoves ? 'Esconder' : 'Mostrar (revela o desafio)'}</Text>
+          </Pressable>
+          {showMoves ? (
           <Text style={[styles.moves, { color: c.inkSoft }]}>
             {game.moves.map((_, i) => (
               <Text key={i} style={i === game.keyPly ? { color: c.whisky, fontFamily: font.bold } : undefined}>
@@ -84,6 +95,7 @@ export default function GameScreen() {
               </Text>
             ))}
           </Text>
+          ) : null}
         </View>
 
         {game.url ? (
@@ -115,6 +127,8 @@ const styles = StyleSheet.create({
   block: { borderRadius: radius.lg, padding: 16, gap: 10, borderWidth: StyleSheet.hairlineWidth },
   blockLabel: { fontFamily: font.bold, fontSize: 11, letterSpacing: 1.2 },
   moves: { fontFamily: font.regular, fontSize: 14, lineHeight: 22 },
+  movesHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  toggle: { fontFamily: font.semibold, fontSize: 13 },
   cta: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.md, padding: 14, borderWidth: StyleSheet.hairlineWidth },
   ctaTxt: { fontFamily: font.semibold, fontSize: 15 },
   note: { fontFamily: font.regular, fontSize: 12, textAlign: 'center' },
