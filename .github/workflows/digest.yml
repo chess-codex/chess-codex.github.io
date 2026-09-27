@@ -32,7 +32,9 @@ jobs:
       - run: npm ci
       # restaura o digest anterior para só traduzir itens novos
       - run: curl -fsSL "https://${{ github.repository_owner }}.github.io/digest.json" -o src/data/digest.json || true
+      # sem chave ou com a IA fora do ar, o site sai mesmo assim com o último digest
       - run: node scripts/digest.mjs
+        continue-on-error: true
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
