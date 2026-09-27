@@ -309,7 +309,7 @@ export function FeedRow({ item, onPress }: { item: FeedItem; onPress?: (item: Fe
   const src = sourceById(item.source);
   const title = tr?.title ?? item.title;
   // resumo da IA só depois de conferido com a fonte; sem isso, o trecho original (o crédito está no topo)
-  const excerpt = (tr?.checked && tr.summary) || item.excerpt;
+  const excerpt = tr?.summary || item.excerpt;
   const flagged = !!digest.items[item.id]?.spoiler;
   // o resumo costuma contar o placar: no Anti-Spoiler some junto com a manchete, e também sozinho
   // quando ele mesmo conta o resultado
@@ -441,10 +441,11 @@ export function NewsCard(props: { story: MicroArticle } | { item: FeedItem }) {
       title: tr?.title ?? i.title,
       flagged,
       safe: flagged && tr ? tr.safeTitle : undefined,
-      // tradução desligada = o leitor pediu o original, então vale o trecho da própria fonte;
-      // o resumo curto da IA só entra depois de conferido com a fonte, senão fica o trecho dela
+      // tradução desligada = o leitor pediu o original, então vale o trecho da própria fonte.
+      // Resumo curto em PT (tradução de título + começo da matéria) aparece já; se a conferência
+      // reprovar, o robô troca o texto dele pelo título traduzido
       summary: settings.translate
-        ? (text?.paragraphs.find((p) => p.trim()) ?? ((tr?.checked && tr.summary) || i.excerpt || undefined))
+        ? (text?.paragraphs.find((p) => p.trim()) ?? (tr?.summary || i.excerpt || undefined))
         : i.excerpt || undefined,
       image: i.image,
       // Google Notícias vem sem foto: a arte leva o nome do veículo original

@@ -66,7 +66,8 @@ export default function Read() {
   // a mesma manchete segura da lista; igual à original ou ainda contando o resultado, vira aviso
   const safe = robot?.spoiler ? safeOrNull(robot.safeTitle, robot.title) : null;
   // resumo curto da IA só depois de conferido com a fonte; sem isso, vale o trecho da própria fonte
-  const shortSummary = tr?.checked ? tr.summary : '';
+  // resumo curto em PT já aparece; se a conferência reprovar, o robô troca pelo título traduzido
+  const shortSummary = tr?.summary ?? '';
   const titleStyle = [styles.title, { color: c.ink, fontSize: 27 * s, lineHeight: 33 * s }];
   const paraStyle = [styles.para, { color: c.ink, fontSize: 17 * s, lineHeight: 26 * s }];
   const cta =

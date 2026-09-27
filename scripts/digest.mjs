@@ -853,8 +853,8 @@ try {
         continue;
       }
       const srcWords = text.split(/\s+/).length;
-      // matéria curta: o resumo acabaria virando a tradução dela inteira
-      if (srcWords < 200) {
+      // matéria muito curta: o resumo acabaria virando a tradução dela inteira
+      if (srcWords < 120) {
         remember(it);
         console.log(`  resumo pulado (matéria curta, ${srcWords} palavras): ${label}`);
         continue;
@@ -871,7 +871,8 @@ try {
       tried++;
       runArticles.tried++;
       // resumo proporcional ao trecho lido: um quarto dele, entre 60 e 200 palavras (proteção de direito autoral)
-      const target = Math.min(200, Math.max(60, Math.round(countWords([essential]) * 0.25)));
+      // até 25% da matéria; nota curta (120 a 240 palavras) ganha resumo de 40 a 60 palavras
+      const target = Math.min(200, Math.max(Math.min(60, Math.round(srcWords * 0.4)), Math.round(countWords([essential]) * 0.25)));
       await sleep(AI_PAUSE);
       t0 = tokensUsed;
       const draft = await ai(
