@@ -1,19 +1,21 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Chip, FeedRow, ScreenHeader } from '@/components/ui';
+import { mentions } from '@/data/players';
 import { sourceById, type SourceId } from '@/data/sources';
-import type { Category } from '@/lib/digest';
+import { usePlayers, type Category } from '@/lib/digest';
 import type { FeedItem } from '@/lib/rss';
 import { useStore, useVisibleItems } from '@/lib/store';
 import { font, usePalette } from '@/lib/theme';
 
 // Radar = tudo sobre xadrez fora das redações: vida dos jogadores, ciência, cultura,
 // vídeos, polêmicas e o que a comunidade está discutindo.
-type Filter = 'tudo' | 'regiao' | 'jogadores' | 'ciencia' | 'video' | 'comunidade' | 'polemica';
+type Filter = 'tudo' | 'top10' | 'regiao' | 'jogadores' | 'ciencia' | 'video' | 'comunidade' | 'polemica';
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'tudo', label: 'Tudo' },
+  { id: 'top10', label: 'Top 10 FIDE' },
   { id: 'video', label: 'Vídeos' },
   { id: 'jogadores', label: 'Jogadores' },
   { id: 'polemica', label: 'Polêmicas' },
@@ -35,13 +37,17 @@ export default function Radar() {
   const c = usePalette();
   const { refreshing, refresh, digest, settings } = useStore();
   const [filter, setFilter] = useState<Filter>('tudo');
+  const players = usePlayers();
+  const top10 = useMemo(() => players.filter((p) => p.list === 'open'), [players]);
 
   const match = useCallback(
     (i: FeedItem) => {
       const kind = sourceById(i.source).kind;
-      if (kind === 'jornal') return false;
       const tr = digest.items[i.id];
       if (tr && !tr.relevant) return false;
+      // Top 10 FIDE: tudo que cita alguém do top 10, de qualquer fonte (inclusive redações)
+      if (filter === 'top10') return mentions(`${i.title} ${i.excerpt} ${tr?.title ?? ''}`, top10).length > 0;
+      if (kind === 'jornal') return false;
       if (filter === 'regiao') return i.source === 'gnews-local';
       if (filter === 'tudo') return true;
       if (filter === 'comunidade') return kind === 'comunidade';
@@ -50,7 +56,7 @@ export default function Radar() {
       if (filter === 'ciencia') return cat === 'ciencia' || cat === 'cultura';
       return cat === filter;
     },
-    [digest, filter],
+    [digest, filter, top10],
   );
   const items = useVisibleItems(match);
 

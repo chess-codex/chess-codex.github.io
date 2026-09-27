@@ -6,12 +6,22 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BOARD_THEMES, type BoardThemeId } from '@/components/Board';
+import { POSTHOG_KEY } from '@/data/config';
 import { usePlayers } from '@/lib/digest';
-import { SOURCES } from '@/data/sources';
+import { SOURCES, type SourceKind } from '@/data/sources';
 import { useStore } from '@/lib/store';
 import { font, radius, usePalette } from '@/lib/theme';
 
 const owl = require('../../assets/brand/owl.png');
+
+// onde cada tipo de fonte aparece no app
+const WHERE: Record<SourceKind, string> = {
+  jornal: 'Redação · Hoje',
+  geral: 'Imprensa · Hoje e Radar',
+  video: 'Vídeo · Radar',
+  // o robô às vezes monta história só com post da comunidade, e ela aparece no Hoje
+  comunidade: 'Comunidade · Radar e histórias do Hoje',
+};
 
 export default function Settings() {
   const c = usePalette();
@@ -111,7 +121,9 @@ export default function Settings() {
 
       <Group title="Seguir jogadores · ranking FIDE">
         <Text style={[styles.groupHint, { color: c.muted }]}>
-          {settings.following.length ? 'Só os marcados aparecem na Home.' : 'Nenhum marcado: a Home acompanha o Top 10 inteiro.'}
+          {settings.following.length
+            ? 'Notícias que citam os marcados sobem nas Notícias do dia, no Hoje.'
+            : 'Nenhum marcado: notícias do Top 10 inteiro sobem nas Notícias do dia, no Hoje.'}
         </Text>
         <View style={styles.words}>
           {players.map((p) => {
@@ -134,7 +146,7 @@ export default function Settings() {
 
       <Group title="Fontes">
         {SOURCES.map((s) => (
-          <Row key={s.id} dot={s.color} label={s.name} hint={s.kind === 'comunidade' ? 'Radar' : 'Redação'}>
+          <Row key={s.id} dot={s.color} label={s.name} hint={WHERE[s.kind]}>
             <Switch value={!settings.hiddenSources.includes(s.id)} onValueChange={() => toggleSource(s.id)} trackColor={{ true: c.whisky, false: c.surfaceAlt }} thumbColor="#fff" />
           </Row>
         ))}
@@ -169,7 +181,9 @@ export default function Settings() {
         <Image source={owl} style={styles.logo} />
         <Text style={[styles.aboutName, { color: c.ink }]}>Chess Codex</Text>
         <Text style={[styles.aboutTxt, { color: c.muted }]}>
-          Versão 0.1 · Sem conta, sem servidor.{'\n'}Suas preferências e salvos ficam só neste aparelho.
+          Versão 0.1 · Sem conta, sem servidor.{'\n'}Suas preferências, curtidas e salvos ficam só neste aparelho.
+          {/* só aparece quando as estatísticas estão ligadas de fato */}
+          {POSTHOG_KEY ? '\nEstatísticas de uso anônimas, sem nome nem e-mail, ajudam a melhorar o app.' : ''}
         </Text>
       </View>
     </ScrollView>

@@ -6,9 +6,9 @@ import { font, usePalette } from '@/lib/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
+// Três abas: a nossa edição (Hoje), tudo o que as fontes publicam (Radar) e o que a pessoa guardou
 const TABS: { name: string; title: string; icon: IconName; iconOn: IconName }[] = [
   { name: 'index', title: 'Hoje', icon: 'newspaper-outline', iconOn: 'newspaper' },
-  { name: 'feed', title: 'Agora', icon: 'flash-outline', iconOn: 'flash' },
   { name: 'radar', title: 'Radar', icon: 'radio-outline', iconOn: 'radio' },
   { name: 'saved', title: 'Salvos', icon: 'bookmark-outline', iconOn: 'bookmark' },
 ];

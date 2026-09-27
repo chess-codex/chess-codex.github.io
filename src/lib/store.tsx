@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 
 import type { BoardThemeId } from '@/components/Board';
@@ -7,6 +7,7 @@ import { DIGEST_URL } from '@/data/config';
 import bundledDigest from '@/data/digest.json';
 import snapshot from '@/data/snapshot.json';
 import { SOURCES, localSource, type SourceId } from '@/data/sources';
+import { track } from './analytics';
 import type { Digest } from './digest';
 import { fetchOgImage, fetchSource, type FeedItem } from './rss';
 import { ThemePrefContext, type ThemePref } from './theme';
@@ -32,6 +33,10 @@ type Store = {
   refresh: () => Promise<void>;
   saved: string[];
   toggleSaved: (id: string) => void;
+  liked: string[];
+  toggleLiked: (id: string, info?: { category?: string; title?: string }) => void;
+  // categoria de cada curtida (id → categoriaKey); alimenta a ordem das Notícias do dia
+  likedCategories: Record<string, string>;
   settings: Settings;
   setSettings: (patch: Partial<Settings>) => void;
   revealed: Set<string>;
@@ -40,9 +45,23 @@ type Store = {
 };
 
 const DEFAULTS: Settings = { antiSpoiler: false, hiddenSources: [], textScale: 1, mutedWords: [], theme: 'system', board: 'madeira', translate: true, following: [], region: '' };
-const K = { items: 'cc.items', saved: 'cc.saved', settings: 'cc.settings', digest: 'cc.digest' };
+const K = {
+  items: 'cc.items', saved: 'cc.saved', settings: 'cc.settings', digest: 'cc.digest',
+  liked: 'cc.liked', likedCategories: 'cc.liked.cat',
+};
 
 const Ctx = createContext<Store | null>(null);
+
+// o app_open sai uma vez por abertura, mesmo que o provider remonte
+let opened = false;
+
+// acentos combinantes (U+0300 a U+036F) montados por código, sem caractere invisível no fonte
+const ACCENTS = new RegExp(`[${String.fromCharCode(0x300)}-${String.fromCharCode(0x36f)}]`, 'g');
+
+/** Categoria em forma comparável: 'Ciência', 'ciencia' e ' CIÊNCIA ' viram a mesma chave. */
+export function categoryKey(s: string): string {
+  return s.normalize('NFD').replace(ACCENTS, '').toLowerCase().trim();
+}
 
 function dedupe(items: FeedItem[]): FeedItem[] {
   const seen = new Set<string>();
@@ -65,17 +84,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
   const [errors, setErrors] = useState<SourceId[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
+  // curtidas e suas categorias andam juntas para nunca ficarem fora de sincronia
+  const [likes, setLikes] = useState<{ ids: string[]; cats: Record<string, string> }>({ ids: [], cats: {} });
   const [settings, setSettingsState] = useState<Settings>(DEFAULTS);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [digest, setDigest] = useState<Digest>(bundledDigest as Digest);
+  // edição mais nova que o aparelho já tem (embutida, guardada ou baixada); o refresh compara com ela
+  const digestAt = useRef(bundledDigest.generatedAt ?? '');
 
   useEffect(() => {
     (async () => {
       try {
-        const [i, s, st, dg] = await AsyncStorage.multiGet([K.items, K.saved, K.settings, K.digest]);
+        const [i, s, st, dg, lk, lc] = await AsyncStorage.multiGet([K.items, K.saved, K.settings, K.digest, K.liked, K.likedCategories]);
         if (dg[1]) {
           const cached = JSON.parse(dg[1]) as Digest;
-          if ((cached.generatedAt ?? '') > (bundledDigest.generatedAt ?? '')) setDigest(cached);
+          // o download do refresh pode ter chegado antes da leitura do cache: nunca volta para uma edição mais velha
+          if ((cached.generatedAt ?? '') > digestAt.current) {
+            digestAt.current = cached.generatedAt ?? '';
+            setDigest(cached);
+          }
         }
         if (i[1]) {
           const cached = JSON.parse(i[1]) as { items: FeedItem[]; updatedAt: string };
@@ -85,9 +112,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
         }
         if (s[1]) setSaved(JSON.parse(s[1]));
+        if (lk[1]) setLikes({ ids: JSON.parse(lk[1]), cats: lc[1] ? JSON.parse(lc[1]) : {} });
         if (st[1]) setSettingsState({ ...DEFAULTS, ...JSON.parse(st[1]) });
       } catch {
         // cache corrompido: segue com o snapshot embutido
+      }
+      if (!opened) {
+        opened = true;
+        track('app_open');
       }
     })();
   }, []);
@@ -96,9 +128,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setRefreshing(true);
     let remote: Digest | null = null;
     try {
-      remote = (await (await fetch(DIGEST_URL, { cache: 'no-store' })).json()) as Digest;
-      setDigest(remote);
-      AsyncStorage.setItem(K.digest, JSON.stringify(remote)).catch(() => {});
+      const fetched = (await (await fetch(DIGEST_URL, { cache: 'no-store' })).json()) as Digest;
+      // Publicado mais velho que o do aparelho (o robô falhou e o site saiu com uma cópia antiga):
+      // fica a edição que o leitor já tem, em vez de voltar no tempo
+      if ((fetched?.generatedAt ?? '') >= digestAt.current) {
+        remote = fetched;
+        digestAt.current = fetched.generatedAt ?? '';
+        setDigest(fetched);
+        AsyncStorage.setItem(K.digest, JSON.stringify(fetched)).catch(() => {});
+      }
     } catch {
       // sem rede ou ainda não publicado: fica com o digest anterior
     }
@@ -150,6 +188,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const toggleLiked = useCallback((id: string, info?: { category?: string; title?: string }) => {
+    setLikes((prev) => {
+      const on = prev.ids.includes(id);
+      const ids = on ? prev.ids.filter((x) => x !== id) : [id, ...prev.ids];
+      // só a categoria fica guardada: o título não serve pra ordenar e não precisa morar aqui
+      const cats = Object.fromEntries(Object.entries(prev.cats).filter(([k]) => k !== id));
+      if (!on && info?.category) cats[id] = categoryKey(info.category);
+      AsyncStorage.multiSet([[K.liked, JSON.stringify(ids)], [K.likedCategories, JSON.stringify(cats)]]).catch(() => {});
+      return { ids, cats };
+    });
+  }, []);
+
   const setSettings = useCallback((patch: Partial<Settings>) => {
     setSettingsState((prev) => {
       const next = { ...prev, ...patch };
@@ -161,8 +211,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const reveal = useCallback((id: string) => setRevealed((p) => new Set(p).add(id)), []);
 
   const value = useMemo(
-    () => ({ items, updatedAt, refreshing, errors, refresh, saved, toggleSaved, settings, setSettings, revealed, reveal, digest }),
-    [items, updatedAt, refreshing, errors, refresh, saved, toggleSaved, settings, setSettings, revealed, reveal, digest],
+    () => ({
+      items, updatedAt, refreshing, errors, refresh, saved, toggleSaved,
+      liked: likes.ids, toggleLiked, likedCategories: likes.cats,
+      settings, setSettings, revealed, reveal, digest,
+    }),
+    [items, updatedAt, refreshing, errors, refresh, saved, toggleSaved, likes, toggleLiked, settings, setSettings, revealed, reveal, digest],
   );
   return (
     <Ctx.Provider value={value}>

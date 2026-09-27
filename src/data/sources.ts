@@ -4,8 +4,8 @@ export type SourceId =
   | 'gnews-local'
   | 'yt-gotham' | 'yt-hikaru' | 'yt-agadmator' | 'yt-chesscom' | 'yt-stlouis';
 
-// jornal = redações de xadrez (aba Agora)
-// geral = imprensa em geral via Google Notícias: vida dos jogadores, ciência, cultura (Radar)
+// jornal = redações de xadrez (Hoje, nas histórias e nas Notícias do dia)
+// geral = imprensa em geral via Google Notícias: vida dos jogadores, ciência, cultura (Hoje e Radar)
 // video = canais do YouTube (Radar) · comunidade = fórum e blogs (Radar)
 export type SourceKind = 'jornal' | 'geral' | 'video' | 'comunidade';
 

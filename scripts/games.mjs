@@ -1,7 +1,11 @@
 // Partidas do dia: baixa as rodadas recentes das transmissões de elite do Lichess (API pública)
 // e acha a posição decisiva de cada jogo pela avaliação do motor lance a lance.
 // Tudo aqui é cálculo sobre o PGN: nenhuma frase é escrita por IA.
+import { readFileSync } from 'node:fs';
+
 import { Chess } from 'chess.js';
+
+import { createEngine } from './engine.mjs';
 
 const UA = { 'User-Agent': 'Mozilla/5.0 ChessCodexNews/0.1' };
 const HOURS = 72; // partidas das últimas 72h servem para ligar às notícias
@@ -70,49 +74,9 @@ export function analyzeGame(raw, meta = {}) {
   // avaliação depois de cada lance (ponto de vista das brancas); buraco herda a anterior
   const ev = [];
   for (let i = 0; i < moves.length; i++) ev.push(evals[i] ?? ev[i - 1] ?? 0.2);
-  const before = (i) => (i === 0 ? 0.2 : ev[i - 1]);
-
-  let keyPly = -1;
-  let kind = 'virada';
-  if (result !== '1/2-1/2') {
-    // o erro decisivo: lance do perdedor que mais piorou a própria avaliação, enquanto ainda não estava perdido
-    const loserIsWhite = result === '0-1';
-    let best = 0;
-    for (let i = 0; i < moves.length; i++) {
-      const whiteMoved = i % 2 === 0;
-      if (whiteMoved !== loserIsWhite) continue;
-      const pov = loserIsWhite ? 1 : -1;
-      const b = before(i) * pov;
-      const a = ev[i] * pov;
-      if (b < -2) continue; // já estava perdido
-      const drop = Math.min(b, 6) - Math.max(a, -6);
-      if (drop > best) {
-        best = drop;
-        keyPly = i;
-      }
-    }
-    kind = 'erro';
-  } else {
-    // empate: a vantagem que escapou
-    let best = 0;
-    for (let i = 0; i < moves.length; i++) {
-      const drop = Math.abs(Math.max(-6, Math.min(6, before(i))) - Math.max(-6, Math.min(6, ev[i])));
-      if (drop > best && drop >= 2 && Math.abs(before(i)) >= 1.5) {
-        best = drop;
-        keyPly = i;
-      }
-    }
-    kind = 'chance';
-  }
-  if (keyPly < 0) return null;
-
-  // virada: o vencedor chegou a estar claramente perdido
-  let comeback = null;
-  if (result !== '1/2-1/2') {
-    const pov = result === '1-0' ? 1 : -1;
-    const worst = Math.min(...ev.map((e) => e * pov));
-    if (worst <= -2.5) comeback = Math.round(worst * 10) / 10;
-  }
+  const k = keyMoment(ev, result);
+  if (!k) return null;
+  const { keyPly } = k;
 
   const moverClockBefore = keyPly >= 2 ? clocks[keyPly - 2] : null;
   const white = tag('White');
@@ -143,13 +107,125 @@ export function analyzeGame(raw, meta = {}) {
     url: tag('GameURL') || meta.url || '',
     moves,
     evals: ev.map((e) => Math.round(e * 10) / 10),
+    ...k,
+    keyClock: moverClockBefore, // segundos que o jogador tinha antes do lance decisivo
+    clocks, // só para recalcular o relógio depois da análise do Stockfish; sai antes de publicar
+    engine: 'transmissão',
+  };
+}
+
+/**
+ * Momento decisivo a partir da avaliação lance a lance (brancas = positivo).
+ * Vitória: lance do perdedor que mais piorou a própria avaliação enquanto ainda não estava perdido.
+ * Empate: a maior vantagem (1,5+) que escapou.
+ */
+export function keyMoment(ev, result) {
+  const before = (i) => (i === 0 ? 0.2 : ev[i - 1]);
+  let keyPly = -1;
+  let keyKind = 'erro';
+  if (result !== '1/2-1/2') {
+    const loserIsWhite = result === '0-1';
+    const pov = loserIsWhite ? 1 : -1;
+    let best = 0;
+    for (let i = 0; i < ev.length; i++) {
+      if ((i % 2 === 0) !== loserIsWhite) continue;
+      const b = before(i) * pov;
+      const a = ev[i] * pov;
+      if (b < -2) continue; // já estava perdido
+      const drop = Math.min(b, 6) - Math.max(a, -6);
+      if (drop > best) {
+        best = drop;
+        keyPly = i;
+      }
+    }
+  } else {
+    keyKind = 'chance';
+    let best = 0;
+    for (let i = 0; i < ev.length; i++) {
+      const drop = Math.abs(Math.max(-6, Math.min(6, before(i))) - Math.max(-6, Math.min(6, ev[i])));
+      if (drop > best && drop >= 2 && Math.abs(before(i)) >= 1.5) {
+        best = drop;
+        keyPly = i;
+      }
+    }
+  }
+  if (keyPly < 0) return null;
+  // virada: o vencedor chegou a estar claramente perdido
+  let comeback = null;
+  if (result !== '1/2-1/2') {
+    const pov = result === '1-0' ? 1 : -1;
+    const worst = Math.min(...ev.map((e) => e * pov));
+    if (worst <= -2.5) comeback = Math.round(worst * 10) / 10;
+  }
+  return {
     keyPly,
-    keyKind: kind,
+    keyKind,
     keyBefore: Math.round(before(keyPly) * 10) / 10,
     keyAfter: Math.round(ev[keyPly] * 10) / 10,
-    keyClock: moverClockBefore, // segundos que o jogador tinha antes do lance decisivo
     comeback,
   };
+}
+
+const ENGINE_DEPTH = 12; // ~4 s por partida no GitHub; basta para achar o erro decisivo
+const ENGINE_GAMES = 24; // quantas partidas (as mais notícia) passam pelo Stockfish por execução
+const KEY_DEPTH = 16; // os números mostrados no momento decisivo saem de análise mais funda
+
+/**
+ * Reavalia as partidas com o nosso Stockfish e recalcula o momento decisivo.
+ * Partida que já foi analisada numa execução anterior (mesmos lances) reaproveita o resultado.
+ * Partida que o Stockfish não consegue analisar sai da lista: sem análise confiável, não publicamos.
+ */
+export async function analyzeWithEngine(games) {
+  let cache = new Map();
+  try {
+    const prev = JSON.parse(readFileSync(new URL('../src/data/digest.json', import.meta.url), 'utf8'));
+    cache = new Map((prev.games ?? []).filter((g) => g.engine === 'Stockfish 19').map((g) => [g.key, g]));
+  } catch {
+    // sem digest anterior: analisa tudo
+  }
+  const engine = await createEngine({ depth: ENGINE_DEPTH });
+  const deep = await createEngine({ depth: KEY_DEPTH });
+  const out = [];
+  try {
+    for (const g of games) {
+      const old = cache.get(g.key);
+      if (old && old.moves.length === g.moves.length) {
+        out.push({ ...g, ...old });
+        continue;
+      }
+      try {
+        const ch = new Chess();
+        const fens = [ch.fen()];
+        for (const m of g.moves) {
+          ch.move(m);
+          fens.push(ch.fen());
+        }
+        const ev = [];
+        for (let i = 1; i < fens.length; i++) ev.push((await engine.evaluate(fens[i])) ?? ev[i - 2] ?? 0.2);
+        let k = keyMoment(ev, g.result);
+        if (!k) continue;
+        // confirma os números do momento decisivo (e dos vizinhos) com análise funda
+        for (let i = Math.max(0, k.keyPly - 2); i <= Math.min(ev.length - 1, k.keyPly + 1); i++) {
+          ev[i] = (await deep.evaluate(fens[i + 1])) ?? ev[i];
+        }
+        k = keyMoment(ev, g.result);
+        if (!k) continue;
+        out.push({
+          ...g,
+          evals: ev.map((e) => Math.round(e * 10) / 10),
+          ...k,
+          keyClock: k.keyPly >= 2 ? g.clocks?.[k.keyPly - 2] ?? null : null,
+          engine: 'Stockfish 19',
+        });
+      } catch (e) {
+        console.warn(`  Stockfish falhou em ${g.key}: ${e.message}`);
+      }
+    }
+  } finally {
+    engine.quit();
+    deep.quit();
+  }
+  return out.map(({ clocks, ...g }) => g);
 }
 
 /** Quão "notícia" é a partida: força dos jogadores + drama + resultado. */
@@ -209,8 +285,15 @@ export async function fetchRecentGames({ topSurnames = [], limit = 16 } = {}) {
       console.warn(`rodada ${r.id}: ${e.message}`);
     }
   }
-  const unique = [...new Map(games.map((g) => [g.key, g])).values()];
+  const candidates = [...new Map(games.map((g) => [g.key, g])).values()];
   const recentCut = Date.now() - FEATURED_HOURS * 3600 * 1000;
+  // pré-seleção pela avaliação da transmissão; as escolhidas (e todas com jogador do Top 10)
+  // são reanalisadas pelo nosso Stockfish, e só essas podem ser publicadas ou ligadas a notícias
+  candidates.sort((a, b) => gameScore(b, topSurnames) - gameScore(a, topSurnames));
+  const withTop = (g) => [g.whiteSurname, g.blackSurname].some((s) => topSurnames.includes(s.toLowerCase()));
+  const toAnalyze = candidates.filter((g, i) => i < ENGINE_GAMES || withTop(g));
+  const unique = await analyzeWithEngine(toAnalyze);
+  console.log(`Stockfish: ${unique.length} de ${toAnalyze.length} partidas reanalisadas`);
   unique.sort((a, b) => gameScore(b, topSurnames) - gameScore(a, topSurnames));
   // variedade: as 4 melhores de cada seção/evento primeiro (ex.: feminino não some atrás do aberto)
   const picked = [];

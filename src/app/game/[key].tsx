@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GameStory, MiniBoard } from '@/components/MiniBoard';
 import { openExternal } from '@/components/ui';
 import { fmtClock, fmtEval, keyCaption, keyTitle, moveLabel, resultLabel, useGame } from '@/lib/games';
-import { useStore } from '@/lib/store';
+import { useResultHidden } from '@/lib/spoiler';
 import { font, radius, usePalette } from '@/lib/theme';
 
 export default function GameScreen() {
@@ -15,7 +15,8 @@ export default function GameScreen() {
   const insets = useSafeAreaInsets();
   const { key } = useLocalSearchParams<{ key: string }>();
   const game = useGame(key);
-  const { settings } = useStore();
+  // mesmo "revelar" do tabuleiro e do relato: revelou num lugar, revelou na tela toda
+  const hideResult = useResultHidden(key ?? '');
   const [showMoves, setShowMoves] = useState(false);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -31,11 +32,12 @@ export default function GameScreen() {
     );
   }
 
-  // dados que saem direto do PGN e da análise do motor
+  // dados que saem direto do PGN e da análise do motor. No Anti-Spoiler a variação da avaliação
+  // fica oculta junto com o resultado: "+1,2 → +4,7" diz quem ganhou do mesmo jeito
   const facts = [
-    { label: 'Resultado', value: settings.antiSpoiler ? '•–•' : resultLabel(game) },
+    { label: 'Resultado', value: hideResult ? '•–•' : resultLabel(game) },
     { label: 'Lances', value: String(Math.ceil(game.moves.length / 2)) },
-    { label: 'Momento-chave', value: `${fmtEval(game.keyBefore)} → ${fmtEval(game.keyAfter)}` },
+    { label: 'Momento-chave', value: hideResult ? 'oculto' : `${fmtEval(game.keyBefore)} → ${fmtEval(game.keyAfter)}` },
     ...(game.keyClock != null ? [{ label: 'Relógio no lance', value: fmtClock(game.keyClock) }] : []),
   ];
 
@@ -47,8 +49,9 @@ export default function GameScreen() {
           <Text style={[styles.barTxt, { color: c.ink }]}>Voltar</Text>
         </Pressable>
         <Pressable
-          onPress={() => Share.share({ message: `${game.white} x ${game.black} (${game.event}, ${game.round})\n${keyCaption(game)}\n${game.url}\n\nvia Chess Codex` })}
+          onPress={() => Share.share({ message: `${game.white} x ${game.black} (${game.event}, ${game.round})\n${keyCaption(game, hideResult)}\n${game.url}\n\nvia Chess Codex` }).catch(() => {})}
           hitSlop={10}
+          accessibilityLabel="Compartilhar"
         >
           <Ionicons name="share-outline" size={22} color={c.ink} />
         </Pressable>
@@ -56,7 +59,7 @@ export default function GameScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40, gap: 18 }}>
         <View style={{ gap: 6 }}>
-          <Text style={[styles.kicker, { color: c.whisky }]}>{`${keyTitle(game)} · ${game.round}`.toUpperCase()}</Text>
+          <Text style={[styles.kicker, { color: c.whisky }]}>{`${keyTitle(game, hideResult)} · ${game.round}`.toUpperCase()}</Text>
           <Text style={[styles.title, { color: c.ink }]}>
             {game.white} <Text style={{ color: c.muted }}>×</Text> {game.black}
           </Text>

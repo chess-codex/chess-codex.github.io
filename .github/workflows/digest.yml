@@ -30,8 +30,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # restaura o digest anterior para só traduzir itens novos
-      - run: curl -fsSL "https://${{ github.repository_owner }}.github.io/digest.json" -o src/data/digest.json || true
+      # restaura o digest anterior para só traduzir itens novos. Baixa num arquivo à parte e só troca
+      # se o JSON estiver inteiro: download cortado não pode derrubar o robô nem o build do site
+      - run: |
+          curl -fsSL "https://${{ github.repository_owner }}.github.io/digest.json" -o /tmp/prev-digest.json \
+            && node -e "JSON.parse(require('fs').readFileSync('/tmp/prev-digest.json', 'utf8'))" \
+            && mv /tmp/prev-digest.json src/data/digest.json || true
       # sem chave ou com a IA fora do ar, o site sai mesmo assim com o último digest
       - run: node scripts/digest.mjs
         continue-on-error: true
@@ -40,7 +44,9 @@ jobs:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
       # site: exporta o app para web já com o digest novo embutido
       - run: npx expo export -p web
-      - run: cp docs/* dist/ && cp dist/index.html dist/404.html
+      # publica o digest mais novo que houver: com o robô ok, é igual ao docs/digest.json; se ele
+      # falhou, sai o restaurado ou o do último checkpoint, nunca a cópia antiga do repositório
+      - run: cp src/data/digest.json docs/digest.json && cp docs/* dist/ && cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

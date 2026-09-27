@@ -13,8 +13,11 @@ export type MicroArticle = {
   // foto de capa, sempre da própria fonte citada em coverage
   image?: string;
   bullets?: string[];
-  // o que cada fonte disse (histórias do robô): nada escrito além do resumo de cada fonte
-  points?: { source: SourceId; publisher?: string; text: string; url: string }[];
+  // "O que aconteceu" em texto corrido (2 a 3 parágrafos), escrito pelo robô e checado nas fontes
+  body?: string[];
+  // o que cada fonte disse (histórias do robô): nada escrito além do resumo de cada fonte.
+  // checked = resumo conferido contra a fonte; sem isso, a página mostra a manchete da fonte
+  points?: { source: SourceId; publisher?: string; text: string; url: string; checked?: boolean }[];
   context?: string;
   stats?: { label: string; value: string }[];
   // partida ligada à notícia; sem caption, a legenda é calculada a partir da posição decisiva

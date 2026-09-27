@@ -143,20 +143,26 @@ export function winnerName(g: Game) {
   return g.result === '1-0' ? g.whiteSurname : g.result === '0-1' ? g.blackSurname : null;
 }
 
-/** Rótulo curto do momento-chave. */
-export function keyTitle(g: Game) {
+/** Rótulo curto do momento-chave. No Anti-Spoiler é neutro: "erro decisivo" já diz quem perdeu. */
+export function keyTitle(g: Game, hideResult = false) {
+  if (hideResult) return 'Momento-chave';
   if (g.comeback) return 'Virada';
   return g.keyKind === 'chance' ? 'Vantagem perdida' : 'Erro decisivo';
 }
 
-/** Legenda do momento-chave, só com dados da partida (lance, relógio, avaliação). */
-export function keyCaption(g: Game) {
+/**
+ * Legenda do momento-chave, só com dados da partida (lance, relógio, avaliação).
+ * Com `hideResult` (Anti-Spoiler), fica só o lance e o relógio: a variação da avaliação
+ * diz quem ficou ganhando tanto quanto o resultado.
+ */
+export function keyCaption(g: Game, hideResult = false) {
   const mover = g.keyPly % 2 === 0 ? g.whiteSurname : g.blackSurname;
+  if (hideResult) return `${mover} jogou ${moveLabel(g, g.keyPly)}${g.keyClock != null ? `, com ${fmtClock(g.keyClock)} no relógio` : ''}.`;
   const clock = g.keyClock != null ? `, com ${fmtClock(g.keyClock)} no relógio,` : '';
   const swing = `a avaliação foi de ${fmtEval(g.keyBefore)} para ${fmtEval(g.keyAfter)}`;
-  if (g.keyKind === 'chance') return `${mover} jogou ${moveLabel(g, g.keyPly)}${clock} e ${swing}. A partida terminou empatada.`;
-  let text = `${mover} jogou ${moveLabel(g, g.keyPly)}${clock} e ${swing}.`;
-  if (g.comeback) text += ` Antes disso, ${winnerName(g)} chegou a estar ${Math.abs(g.comeback).toFixed(1).replace('.', ',')} peões atrás.`;
+  const text = `${mover} jogou ${moveLabel(g, g.keyPly)}${clock} e ${swing}.`;
+  if (g.keyKind === 'chance') return `${text} A partida terminou empatada.`;
+  if (g.comeback) return `${text} Antes disso, ${winnerName(g)} chegou a estar ${Math.abs(g.comeback).toFixed(1).replace('.', ',')} peões atrás.`;
   return text;
 }
 

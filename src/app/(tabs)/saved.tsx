@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { FeedRow, MicroCard, ScreenHeader } from '@/components/ui';
+import { FeedRow, MicroCard, ScreenHeader, openFeedItem } from '@/components/ui';
 import { useArticles } from '@/lib/digest';
 import { useStore } from '@/lib/store';
 import { font, usePalette } from '@/lib/theme';
 
 export default function Saved() {
   const c = usePalette();
-  const { saved, items } = useStore();
+  const { saved, items, digest } = useStore();
   const articles = useArticles().filter((a) => saved.includes(a.id));
-  const feed = saved.map((id) => items.find((i) => i.id === id)).filter((i) => i != null);
+  // o feed do robô é a reserva: item salvo que já saiu da lista baixada no aparelho
+  const feed = saved
+    .map((id) => items.find((i) => i.id === id) ?? digest.feed.find((i) => i.id === id))
+    .filter((i) => i != null);
 
   return (
     <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={{ paddingBottom: 32 }}>
@@ -29,7 +32,8 @@ export default function Saved() {
           </View>
         ))}
       </View>
-      {feed.map((i) => <FeedRow key={i.id} item={i} />)}
+      {/* quem guardou quer ler: abre o nosso leitor, não o site */}
+      {feed.map((i) => <FeedRow key={i.id} item={i} onPress={openFeedItem} />)}
     </ScrollView>
   );
 }

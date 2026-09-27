@@ -4,16 +4,19 @@ import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fmtEval, keyTitle, moveLabel, resultLabel, type Game } from '@/lib/games';
+import { useResultHidden } from '@/lib/spoiler';
 import { useStore } from '@/lib/store';
 import { font, radius, usePalette } from '@/lib/theme';
 import { Board } from './Board';
 
 const SIZE = 144;
 
-/** Card da Home: a posição decisiva congelada, jogadores e o que aconteceu. */
+/** Card das Partidas do dia: a posição decisiva congelada, jogadores e o que aconteceu. */
 export const GameCard = memo(function GameCard({ game }: { game: Game }) {
   const c = usePalette();
   const { settings } = useStore();
+  // mesmo "revelar" da tela da partida; "Erro decisivo" também diria quem perdeu
+  const hideResult = useResultHidden(game.key);
   const { fen, last } = useMemo(() => {
     const ch = new Chess();
     let mv = null;
@@ -31,15 +34,15 @@ export const GameCard = memo(function GameCard({ game }: { game: Game }) {
       </View>
       <View style={styles.body}>
         <View style={[styles.badge, { backgroundColor: c.whiskySoft }]}>
-          <Text style={[styles.badgeTxt, { color: c.whisky }]}>{keyTitle(game)}</Text>
+          <Text style={[styles.badgeTxt, { color: c.whisky }]}>{keyTitle(game, hideResult)}</Text>
         </View>
         <Text style={[styles.players, { color: c.ink }]} numberOfLines={1}>{game.whiteSurname}</Text>
         <Text style={[styles.players, { color: c.ink }]} numberOfLines={1}>{game.blackSurname}</Text>
         <Text style={[styles.meta, { color: c.muted }]} numberOfLines={1}>
-          {settings.antiSpoiler ? game.round : `${resultLabel(game)} · ${game.round}`}
+          {hideResult ? game.round : `${resultLabel(game)} · ${game.round}`}
         </Text>
         <Text style={[styles.key, { color: c.inkSoft }]} numberOfLines={2}>
-          {settings.antiSpoiler ? 'Toque para ver a posição decisiva' : `${moveLabel(game, game.keyPly)}: ${fmtEval(game.keyBefore)} → ${fmtEval(game.keyAfter)}`}
+          {hideResult ? 'Toque para ver a posição decisiva' : `${moveLabel(game, game.keyPly)}: ${fmtEval(game.keyBefore)} → ${fmtEval(game.keyAfter)}`}
         </Text>
       </View>
     </Pressable>
