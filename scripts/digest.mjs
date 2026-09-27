@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { SOURCES, isKnownItemId, wantsOgImage } from '../src/data/sources.ts';
 import { fetchOgImage, notPhoto, parseSource } from '../src/lib/rss.ts';
-import { copiedRun, essentials, feedOverlap, fetchArticle, hasQuote, parseChecks, sentences } from './articles.mjs';
+import { copiedRun, essentials, feedOverlap, fetchArticle, hasQuote, isPortuguese, parseChecks, sentences } from './articles.mjs';
 import { fetchTop } from './fide.mjs';
 import { fetchRecentGames, linkGame } from './games.mjs';
 
@@ -598,7 +598,8 @@ Devolva JSON {"ok":[{"n":1,"v":true},...]} com exatamente um objeto por item, co
 ${GLOSSARY}`;
 
 // regras comuns aos dois redatores
-const WRITING_RULES = `- SOMENTE fatos que estão no material. Sem opinião e sem conhecimento próprio: nada de contexto, histórico, idade, ranking, recorde, comparação ou "primeira vez" que o material não diga.
+const WRITING_RULES = `- Escreva TUDO em português do Brasil, mesmo que o material esteja em inglês ou espanhol. Citações também vão traduzidas para o português (entre aspas, dizendo quem falou). Nomes de países em português (Índia, Alemanha, Holanda); nomes de pessoas e torneios como no material.
+- SOMENTE fatos que estão no material. Sem opinião e sem conhecimento próprio: nada de contexto, histórico, idade, ranking, recorde, comparação ou "primeira vez" que o material não diga.
 - Atribua declarações e avaliações a quem as fez, com o nome que aparece no material. No máximo UMA citação direta no texto todo, sempre entre aspas curvas “ ” (nunca aspas simples), curta e dizendo quem falou; o resto em discurso indireto.
 - Não cite lances de xadrez nem notação (o app mostra a partida): descreva em palavras, como "sacrificou a dama" ou "errou no fim do jogo".
 - Nomes, números, placares e datas exatamente como no material. Brancas e pretas nunca trocadas.
@@ -769,7 +770,9 @@ try {
 const WEEK = 7 * 24 * 3600 * 1000;
 const keepArticle = (id, a) =>
   byId.has(id) || (failedFeeds.has(sourceOfId(id)) && Date.now() - Date.parse(a?.generatedAt) < WEEK);
-const articles = Object.fromEntries(Object.entries(prev.articles ?? {}).filter(([id, a]) => keepArticle(id, a)));
+const articles = Object.fromEntries(
+  Object.entries(prev.articles ?? {}).filter(([id, a]) => keepArticle(id, a) && (!a.paragraphs?.length || isPortuguese(a.paragraphs.join(' ')))),
+);
 const hasText = (a) => Array.isArray(a?.paragraphs) && a.paragraphs.length > 0;
 // Matéria descartada fica registrada sem texto (o app ignora) e só é tentada de novo depois de 24 h,
 // para não queimar cota toda execução com a mesma página.
@@ -927,6 +930,10 @@ try {
         continue;
       }
       const paragraphs = rebuild(list, mask);
+      if (!isPortuguese(paragraphs.join(' '))) {
+        discard(`fora do português; ${spent}`);
+        continue;
+      }
       articles[it.id] = { paragraphs, words: countWords(paragraphs), source: sourceName(it), generatedAt: new Date().toISOString() };
       runArticles.ok++;
       console.log(`  resumo ok: ${label} (${kept}/${list.length} frases, ${tally}, ${articles[it.id].words} palavras; ${spent})`);
@@ -970,7 +977,8 @@ try {
         continue;
       }
       const cached = doneStories.get(storyKey(st));
-      if (cached) {
+      // texto guardado de uma execução antiga que saiu com trecho em outro idioma é refeito
+      if (cached && isPortuguese(cached.body.join(' '))) {
         st.body = cached.body;
         st.why = typeof cached.why === 'string' ? cached.why : '';
         continue;
@@ -1038,7 +1046,12 @@ try {
         fail(st, `${kept}/${bodyList.length} frases com base; ${cost()} tokens`);
         continue;
       }
-      st.body = rebuild(bodyList, mask);
+      const body = rebuild(bodyList, mask);
+      if (!isPortuguese(body.join(' '))) {
+        fail(st, `fora do português; ${cost()} tokens`);
+        continue;
+      }
+      st.body = body;
       // "por que importa" só entra inteiro: uma frase sem base derruba a seção
       const whyOk = whyList.length > 0 && whyList.every((s, n) => ok(bodyList.length + n, s));
       st.why = whyOk ? whyList.join(' ') : '';

@@ -324,6 +324,31 @@ let cachedWords = '';
 
 // Anti-cópia: true se a frase repete n ou mais palavras seguidas do texto original
 // (sem diferenciar maiúsculas, acentos e pontuação).
+// Palavras curtas que quase só aparecem em cada idioma: bastam para separar PT de EN/ES
+const PT_WORDS = /\b(não|são|está|também|uma|dos|das|pelo|pela|foi|ao|às|em|com o|com a|que o|que a)\b|ção\b|ções\b|ões\b/gi;
+const EN_WORDS = /\b(the|and|of|was|with|his|her|their|this|that|is|were|has|have|after|won)\b/gi;
+const ES_WORDS = /\b(el|los|las|del|y|fue|con el|también|una vez|según|sus)\b|ción\b|ciones\b/gi;
+
+/**
+ * O texto está em português? O redator às vezes responde no idioma da fonte.
+ * Confere o texto inteiro e, à parte, cada citação entre aspas (citação em inglês também reprova).
+ */
+export function isPortuguese(text) {
+  const score = (s) => {
+    const pt = (s.match(PT_WORDS) ?? []).length;
+    const en = (s.match(EN_WORDS) ?? []).length;
+    const es = (s.match(ES_WORDS) ?? []).length;
+    return { pt, other: Math.max(en, es) };
+  };
+  const all = score(text);
+  if (all.pt < 3 || all.pt <= all.other * 1.5) return false;
+  for (const [, q] of text.matchAll(/[“"«]([^”"»]{12,})[”"»]/g)) {
+    const s = score(q);
+    if (s.other >= 2 && s.other > s.pt) return false;
+  }
+  return true;
+}
+
 export function copiedRun(sentence, sourceText, n = 10) {
   const w = words(sentence);
   if (w.length < n) return false;
