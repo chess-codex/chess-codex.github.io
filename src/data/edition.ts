@@ -69,7 +69,6 @@ export const EDITION: Edition = {
         { source: 'chesscom', title: 'Uzbekistan Beats U.S. To Take Sole Lead', url: 'https://www.chess.com/news/view/2026-samarkand-chess-olympiad-round-9' },
         { source: 'lichess', title: 'Rounds 7–9: Uzbekistan & China Lead', url: 'https://lichess.org/@/Lichess/blog/2026-samarkand-olympiad-rounds-7-9-uzbekistan-china-lead-open-and-womens/MF1Hjp6Z' },
         { source: 'fide', title: 'Uzbekistan takes a giant step towards gold', url: 'https://www.fide.com/olympiad-day-9-uzbekistan-takes-a-giant-step-towards-gold/' },
-        { source: 'reddit', title: 'Nodirbekistan beats USA', url: 'https://www.reddit.com/r/chess/comments/1wpz9n9/nodirbekistan_beats_usa/' },
       ],
       tag: 'Torneios',
       minutes: 2,
@@ -97,7 +96,6 @@ export const EDITION: Edition = {
       game: { key: 'donchenko-gukeshd', ply: 90, caption: 'Brancas +3,9. Aqui Donchenko joga Tee3 e a vantagem começa a sumir.' },
       coverage: [
         { source: 'chesscom', title: 'Uzbekistan Beats U.S. To Take Sole Lead', url: 'https://www.chess.com/news/view/2026-samarkand-chess-olympiad-round-9' },
-        { source: 'reddit', title: 'Gukesh swindles Donchenko from a completely lost position', url: 'https://www.reddit.com/r/chess/comments/1wpzel5/gukesh_dommaraju_swindles_alexander_donchenko/' },
         { source: 'fide', title: 'Olympiad Day 9', url: 'https://www.fide.com/olympiad-day-9-uzbekistan-takes-a-giant-step-towards-gold/' },
       ],
       tag: 'Jogadores',
@@ -107,7 +105,6 @@ export const EDITION: Edition = {
     },
     {
       id: 'so-sindarov',
-      image: 'https://preview.redd.it/xenzap9bhorh1.png?width=640&crop=smart&auto=webp&s=53fd4d063df7f2da9a6109b2b6aa4be9bdda9fc7',
       kicker: 'Olimpíada · Tabuleiro 2',
       title: 'Wesley So derruba o desafiante ao título mundial',
       safeTitle: 'So × Sindarov: o duelo do tabuleiro 2',
@@ -121,7 +118,6 @@ export const EDITION: Edition = {
         'Sindarov chega ao match pelo título mundial sob holofote. Uma derrota com as pretas em casa não muda o favoritismo, mas vai alimentar a discussão sobre sua forma nos finais.',
       game: { key: 'so-sindarov', caption: 'Posição antes de …Tc2, o erro que decidiu a partida.' },
       coverage: [
-        { source: 'reddit', title: 'Wesley So defeats Javokhir Sindarov', url: 'https://www.reddit.com/r/chess/comments/1wpy38l/wesley_so_defeats_javokhir_sindarov/' },
         { source: 'chesscom', title: 'Uzbekistan Beats U.S. To Take Sole Lead', url: 'https://www.chess.com/news/view/2026-samarkand-chess-olympiad-round-9' },
       ],
       tag: 'Jogadores',
@@ -144,7 +140,6 @@ export const EDITION: Edition = {
       context:
         'Normas de título exigem desempenho alto contra adversárias tituladas em torneios fortes. Fechar as três antes dos 12 anos coloca Bodhana entre as mais precoces da história do xadrez feminino.',
       coverage: [
-        { source: 'reddit', title: 'Bodhana draws Mai Narva to achieve her final WGM norm', url: 'https://www.reddit.com/r/chess/comments/1wpynph/bodhana_sivanandan_draws_mai_narva_to_achieve_her/' },
         { source: 'chessbase', title: 'Bodhana Sivanandan: Chess and other passions', url: 'https://en.chessbase.com/post/bodhana-sivanandan-chess-and-other-passions' },
       ],
       tag: 'Jogadores',

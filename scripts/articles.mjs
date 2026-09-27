@@ -2,7 +2,11 @@
 // (sem menu, rodapé, legenda de foto ou aviso de cookies). Serve de base para o resumo
 // que a IA escreve e para a checagem frase a frase. Nada aqui usa IA.
 const UA = { 'User-Agent': 'Mozilla/5.0 ChessCodexNews/0.1' };
-const MAX_CHARS = 6000; // cabe no limite de tokens do plano grátis com folga para a resposta
+// texto extraído: serve para medir a matéria e conferir se ela bate com o feed. A IA recebe só o
+// trecho essencial (essentials), que é o que pesa na cota de tokens
+const MAX_CHARS = 6000;
+// trecho mandado para escrever e checar o resumo: o começo da matéria concentra os fatos
+export const ESSENTIAL_CHARS = 3500;
 const MIN_PARAGRAPH = 60; // parágrafo curto costuma ser botão, crédito ou legenda
 
 // Blocos que nunca são a matéria. Embeds de redes sociais também saem: são citações soltas com @, data e link.
@@ -274,6 +278,37 @@ export function sentences(paragraph) {
   }
   const tail = text.slice(start).trim();
   if (tail) out.push(tail);
+  return out;
+}
+
+// Trecho essencial da matéria para a IA: os primeiros parágrafos (lead e desenvolvimento, onde
+// estão os fatos) até max caracteres. Corta entre parágrafos ou entre frases, nunca no meio de uma
+// frase. Escrita e checagem recebem o mesmo trecho: o que a IA não viu não pode entrar no resumo.
+export function essentials(text, max = ESSENTIAL_CHARS) {
+  const paras = String(text ?? '').split(/\n{2,}/).map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  let out = '';
+  for (const p of paras) {
+    const next = out ? `${out}\n\n${p}` : p;
+    if (next.length <= max) {
+      out = next;
+      continue;
+    }
+    // o parágrafo não cabe inteiro: entram as frases dele que cabem, na ordem
+    const room = max - (out ? out.length + 2 : 0);
+    let part = '';
+    for (const s of sentences(p)) {
+      const more = part ? `${part} ${s}` : s;
+      if (more.length > room) break;
+      part = more;
+    }
+    if (part) out = out ? `${out}\n\n${part}` : part;
+    break;
+  }
+  // primeira frase maior que o limite inteiro (bloco sem pontuação, como uma lista): corta no último espaço
+  if (!out && paras.length) {
+    const cut = paras[0].slice(0, max);
+    out = cut.slice(0, cut.lastIndexOf(' ') > 0 ? cut.lastIndexOf(' ') : max).trim();
+  }
   return out;
 }
 

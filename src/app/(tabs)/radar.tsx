@@ -10,13 +10,14 @@ import { useStore, useVisibleItems } from '@/lib/store';
 import { font, usePalette } from '@/lib/theme';
 
 // Radar = tudo sobre xadrez fora das redações: vida dos jogadores, ciência, cultura,
-// vídeos, polêmicas e o que a comunidade está discutindo.
-type Filter = 'tudo' | 'top10' | 'regiao' | 'jogadores' | 'ciencia' | 'video' | 'comunidade' | 'polemica';
+// vídeos, redes sociais, polêmicas e o que a comunidade está discutindo.
+type Filter = 'tudo' | 'top10' | 'regiao' | 'jogadores' | 'ciencia' | 'video' | 'redes' | 'comunidade' | 'polemica';
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'tudo', label: 'Tudo' },
   { id: 'top10', label: 'Top 10 FIDE' },
   { id: 'video', label: 'Vídeos' },
+  { id: 'redes', label: 'Redes' },
   { id: 'jogadores', label: 'Jogadores' },
   { id: 'polemica', label: 'Polêmicas' },
   { id: 'ciencia', label: 'Curiosidades' },
@@ -52,6 +53,7 @@ export default function Radar() {
       if (filter === 'tudo') return true;
       if (filter === 'comunidade') return kind === 'comunidade';
       if (filter === 'video') return kind === 'video';
+      if (filter === 'redes') return kind === 'social';
       const cat = tr?.category ?? fallbackCategory(i.source);
       if (filter === 'ciencia') return cat === 'ciencia' || cat === 'cultura';
       return cat === filter;
@@ -83,7 +85,7 @@ export default function Radar() {
       ListEmptyComponent={<Text style={[styles.empty, { color: c.muted }]}>Nada por aqui agora. Puxe para atualizar.</Text>}
       ListFooterComponent={
         <Text style={[styles.note, { color: c.muted }]}>
-          Imprensa geral, YouTube, r/chess e blogs do Lichess. Cada item leva à publicação original.
+          Imprensa geral, YouTube, perfis no Bluesky e no Mastodon e blogs de xadrez. Cada item leva à publicação original.
         </Text>
       }
       contentContainerStyle={{ paddingBottom: 32 }}

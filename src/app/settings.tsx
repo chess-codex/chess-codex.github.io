@@ -21,6 +21,8 @@ const WHERE: Record<SourceKind, string> = {
   video: 'Vídeo · Radar',
   // o robô às vezes monta história só com post da comunidade, e ela aparece no Hoje
   comunidade: 'Comunidade · Radar e histórias do Hoje',
+  // post de rede social nunca entra nas histórias nem nas Notícias do dia
+  social: 'Rede social · Radar',
 };
 
 export default function Settings() {

@@ -37,9 +37,10 @@ Em produção roda sozinho a cada 3 horas pelo GitHub Actions (`.github/workflow
 
 ## Arquitetura (custo zero)
 
-- **Local-first**: o celular baixa os RSS direto (Chess.com, FIDE, ChessBase, Lichess, blogs do Lichess, r/chess). Não existe servidor.
+- **Local-first**: o celular baixa os feeds direto (lista em `src/data/sources.ts`): redações e entidades oficiais (Chess.com em inglês e em português, FIDE, ChessBase, Lichess, federações de MG, PR e da Espanha, ECU), seções de xadrez de jornais (El País, The Guardian, Sportstar), Google Notícias, YouTube, blogs e perfis públicos no Bluesky e no Mastodon. Não existe servidor.
+- **Redes sociais**: X e Instagram não têm leitura pública sem conta e plano pago, então ficam de fora. Os perfis do Bluesky vêm da API pública dele (sem conta nem chave) e os do Mastodon, do RSS. Aparecem só no Radar (filtro "Redes") e nunca viram história.
 - **Salvos e ajustes** ficam no AsyncStorage do aparelho. Não há conta nem login.
-- **Fotos**: vêm do RSS; quando o feed não traz foto (Chess.com, ChessBase), o app lê a `og:image` da página.
+- **Fotos**: vêm do feed; quando ele não traz foto (Chess.com, ChessBase), o app lê a `og:image` da página. Notícia sem foto (Google Notícias) ganha uma arte de reserva com o cavalo e o nome da fonte.
 - **Edição do dia** (`src/data/edition.ts`): micro-artigos em PT. Em produção vira um JSON publicado de graça no GitHub Pages.
 - **Partidas**: PGN da API de broadcast do Lichess, com avaliação do motor lance a lance. O "lance da virada" é detectado automaticamente pela maior oscilação de avaliação.
 

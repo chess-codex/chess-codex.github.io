@@ -71,7 +71,7 @@ export default function Read() {
   const paraStyle = [styles.para, { color: c.ink, fontSize: 17 * s, lineHeight: 26 * s }];
   const cta =
     src.kind === 'video' ? `Assistir em ${fonte}`
-    : item.source === 'reddit' ? `Ler a discussão completa em ${fonte}`
+    : src.kind === 'social' ? `Ver o post em ${fonte}`
     : `Ler a matéria completa em ${fonte}`;
 
   return (

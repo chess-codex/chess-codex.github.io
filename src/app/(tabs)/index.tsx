@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { GameCard } from '@/components/GameCard';
@@ -89,6 +90,18 @@ export default function Today() {
   );
   const pool = useVisibleItems(candidate);
 
+  // Curtir no próprio cartão não embaralha a lista enquanto se lê: a curtida entra na ordem
+  // quando chega edição nova ou quando se volta para a aba, não no toque
+  const [likeSnap, setLikeSnap] = useState({ liked, likedCategories, updatedAt, digest });
+  if (likeSnap.updatedAt !== updatedAt || likeSnap.digest !== digest) {
+    setLikeSnap({ liked, likedCategories, updatedAt, digest });
+  }
+  const latestLikes = useRef({ liked, likedCategories });
+  useEffect(() => {
+    latestLikes.current = { liked, likedCategories };
+  }, [liked, likedCategories]);
+  useFocusEffect(useCallback(() => setLikeSnap((s) => ({ ...s, ...latestLikes.current })), []));
+
   const news = useMemo<Entry[]>(() => {
     // sem escolha do leitor, o Top 10 FIDE inteiro ganha o bônus
     const tracked = settings.following.length
@@ -96,8 +109,8 @@ export default function Today() {
       : players.filter((p) => p.list === 'open');
     // curtidas por categoria; curtida sem categoria guardada usa a do robô ou a editoria da história
     const likes = new Map<string, number>();
-    for (const id of liked) {
-      const cat = likedCategories[id] ?? digest.items[id]?.category ?? articles.find((a) => a.id === id)?.tag;
+    for (const id of likeSnap.liked) {
+      const cat = likeSnap.likedCategories[id] ?? digest.items[id]?.category ?? articles.find((a) => a.id === id)?.tag;
       if (cat) likes.set(categoryKey(cat), (likes.get(categoryKey(cat)) ?? 0) + 1);
     }
     const ranked = pool
@@ -128,7 +141,7 @@ export default function Today() {
       out.push({ item: i });
     }
     return out;
-  }, [pool, articles, visible, muted, players, settings.following, liked, likedCategories, digest]);
+  }, [pool, articles, visible, muted, players, settings.following, likeSnap, digest]);
 
   const hour = new Date().getHours();
   const label = hour < 12 ? 'Manhã' : hour < 18 ? 'Tarde' : 'Noite';

@@ -6,10 +6,10 @@ import type { BoardThemeId } from '@/components/Board';
 import { DIGEST_URL } from '@/data/config';
 import bundledDigest from '@/data/digest.json';
 import snapshot from '@/data/snapshot.json';
-import { SOURCES, localSource, type SourceId } from '@/data/sources';
+import { SOURCES, isKnownItemId, isKnownSource, localSource, wantsOgImage, type SourceId } from '@/data/sources';
 import { track } from './analytics';
-import type { Digest } from './digest';
-import { fetchOgImage, fetchSource, type FeedItem } from './rss';
+import type { Digest, DigestStory } from './digest';
+import { fetchOgImage, fetchSource, notPhoto, type FeedItem } from './rss';
 import { ThemePrefContext, type ThemePref } from './theme';
 
 // Tudo mora no aparelho. Sem conta, sem servidor, sem banco na nuvem.
@@ -71,12 +71,38 @@ function dedupe(items: FeedItem[]): FeedItem[] {
 }
 
 // Posts da comunidade Lichess em outros alfabetos poluem um feed em PT; filtra no MVP.
-const latinOnly = (i: FeedItem) => !/[Ѐ-ӿ؀-ۿऀ-ॿ一-鿿]/.test(i.title);
+// Item de fonte que saiu do app (o r/chess, em cache ou em digest antigo) também fica de fora.
+const keepItem = (i: FeedItem) => isKnownSource(i.source) && !/[Ѐ-ӿ؀-ۿऀ-ॿ一-鿿]/.test(i.title);
+
+/**
+ * Tira do digest o que veio de fonte removida: do feed, das histórias e dos tópicos delas.
+ * O item da história é reconhecido pelo id, porque a edição anterior que o robô mantém (ou o
+ * checkpoint publicado quando ele cai no meio) pode citar item que já nem está no feed.
+ */
+function cleanDigest(d: Digest): Digest {
+  const feed = Array.isArray(d.feed) ? d.feed : [];
+  const stories = Array.isArray(d.stories) ? d.stories : [];
+  const points = (s: DigestStory) => (Array.isArray(s.points) ? s.points : []);
+  const stale =
+    feed.some((i) => !isKnownSource(i.source)) ||
+    stories.some((s) => s && Array.isArray(s.itemIds) && (!s.itemIds.every(isKnownItemId) || points(s).some((p) => !isKnownSource(p?.source))));
+  if (!stale) return d;
+  return {
+    ...d,
+    feed: feed.filter((i) => isKnownSource(i.source)),
+    stories: stories
+      // história malformada segue como veio: o useArticles já a descarta
+      .map((s) => (s && Array.isArray(s.itemIds)
+        ? { ...s, itemIds: s.itemIds.filter(isKnownItemId), points: s.points && points(s).filter((p) => isKnownSource(p?.source)) }
+        : s))
+      .filter((s) => !s || !Array.isArray(s.itemIds) || s.itemIds.length > 0),
+  };
+}
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   // começa pelo que for mais novo entre o feed do robô e o snapshot embutido
   const [items, setItems] = useState<FeedItem[]>(() =>
-    dedupe([...((bundledDigest as Digest).feed ?? []), ...(snapshot.items as FeedItem[])]).filter(latinOnly),
+    dedupe([...((bundledDigest as Digest).feed ?? []), ...(snapshot.items as FeedItem[])]).filter(keepItem),
   );
   const [updatedAt, setUpdatedAt] = useState(
     (bundledDigest.generatedAt ?? '') > snapshot.fetchedAt ? (bundledDigest.generatedAt as string) : snapshot.fetchedAt,
@@ -88,7 +114,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [likes, setLikes] = useState<{ ids: string[]; cats: Record<string, string> }>({ ids: [], cats: {} });
   const [settings, setSettingsState] = useState<Settings>(DEFAULTS);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
-  const [digest, setDigest] = useState<Digest>(bundledDigest as Digest);
+  const [digest, setDigest] = useState<Digest>(() => cleanDigest(bundledDigest as Digest));
   // edição mais nova que o aparelho já tem (embutida, guardada ou baixada); o refresh compara com ela
   const digestAt = useRef(bundledDigest.generatedAt ?? '');
 
@@ -101,13 +127,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           // o download do refresh pode ter chegado antes da leitura do cache: nunca volta para uma edição mais velha
           if ((cached.generatedAt ?? '') > digestAt.current) {
             digestAt.current = cached.generatedAt ?? '';
-            setDigest(cached);
+            setDigest(cleanDigest(cached));
           }
         }
         if (i[1]) {
           const cached = JSON.parse(i[1]) as { items: FeedItem[]; updatedAt: string };
           if (cached.updatedAt > snapshot.fetchedAt) {
-            setItems(cached.items);
+            setItems(cached.items.filter(keepItem));
             setUpdatedAt(cached.updatedAt);
           }
         }
@@ -128,10 +154,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setRefreshing(true);
     let remote: Digest | null = null;
     try {
-      const fetched = (await (await fetch(DIGEST_URL, { cache: 'no-store' })).json()) as Digest;
+      const raw = (await (await fetch(DIGEST_URL, { cache: 'no-store' })).json()) as Digest;
       // Publicado mais velho que o do aparelho (o robô falhou e o site saiu com uma cópia antiga):
       // fica a edição que o leitor já tem, em vez de voltar no tempo
-      if ((fetched?.generatedAt ?? '') >= digestAt.current) {
+      if ((raw?.generatedAt ?? '') >= digestAt.current) {
+        const fetched = cleanDigest(raw);
         remote = fetched;
         digestAt.current = fetched.generatedAt ?? '';
         setDigest(fetched);
@@ -143,7 +170,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // No navegador os feeds são bloqueados por CORS: o site vive só do feed publicado pelo robô.
     if (Platform.OS === 'web') {
       if (remote?.feed?.length && remote.generatedAt) {
-        setItems(dedupe(remote.feed).filter(latinOnly));
+        setItems(dedupe(remote.feed).filter(keepItem));
         setUpdatedAt(remote.generatedAt);
       }
       setRefreshing(false);
@@ -157,14 +184,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setErrors(failed);
     if (fresh.length) {
       // reaproveita fotos já descobertas e busca og:image das 40 mais recentes que vierem sem foto
-      const known = new Map(items.filter((i) => i.image).map((i) => [i.url, i.image]));
+      // (as que o robô achou chegam no feed do digest e poupam o download da página no celular)
+      const known = new Map([...(remote?.feed ?? []), ...items].filter((i) => i.image && !notPhoto(i.image)).map((i) => [i.url, i.image]));
       for (const i of fresh) i.image ??= known.get(i.url);
-      const needPhoto = fresh.filter((i) => !i.image && !i.source.startsWith('gnews') && !i.source.startsWith('yt-') && i.source !== 'reddit').slice(0, 40);
+      // fresh vem na ordem das fontes: sem ordenar, as 40 seriam só do Chess.com (inglês e português)
+      const needPhoto = fresh
+        .filter((i) => !i.image && wantsOgImage(i.source))
+        .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+        .slice(0, 40);
       for (let k = 0; k < needPhoto.length; k += 6) {
         await Promise.all(needPhoto.slice(k, k + 6).map(async (i) => { i.image = await fetchOgImage(i.url); }));
       }
       // mantém itens antigos das fontes que falharam
-      const next = dedupe([...fresh, ...items.filter((i) => failed.includes(i.source))]).filter(latinOnly).slice(0, 300);
+      const next = dedupe([...fresh, ...items.filter((i) => failed.includes(i.source))]).filter(keepItem).slice(0, 300);
       const now = new Date().toISOString();
       setItems(next);
       setUpdatedAt(now);
