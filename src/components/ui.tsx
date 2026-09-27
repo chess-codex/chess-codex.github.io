@@ -193,7 +193,7 @@ export function MicroCard({ a, hero }: { a: MicroArticle; hero?: boolean }) {
             <View key={s} style={[styles.stackDot, { backgroundColor: sourceById(s).color, marginLeft: i ? -5 : 0, borderColor: navy ? c.brand : c.surface }]} />
           ))}
           <Text style={[styles.stackTxt, { color: navy ? 'rgba(255,255,255,0.75)' : c.muted }]}>
-            {new Set(a.coverage.map((x) => x.source)).size} fontes
+            {new Set(a.coverage.map((x) => x.source)).size === 1 ? "1 fonte" : `${new Set(a.coverage.map((x) => x.source)).size} fontes`}
           </Text>
         </View>
         {a.game ? (

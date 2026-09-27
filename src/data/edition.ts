@@ -17,7 +17,8 @@ export type MicroArticle = {
   points?: { source: SourceId; publisher?: string; text: string; url: string }[];
   context?: string;
   stats?: { label: string; value: string }[];
-  game?: { key: string; ply?: number; caption: string };
+  // partida ligada à notícia; sem caption, a legenda é calculada a partir da posição decisiva
+  game?: { key: string; ply?: number; caption?: string };
   coverage: { source: SourceId; title: string; url: string }[];
   tag: 'Torneios' | 'Jogadores' | 'Plataformas' | 'Bastidores';
   minutes: number;

@@ -42,6 +42,7 @@ function AppStack() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="story/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="game/[key]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>
     </>

@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { SOURCES } from '../src/data/sources.ts';
 import { fetchOgImage, parseFeed } from '../src/lib/rss.ts';
 import { fetchTop } from './fide.mjs';
+import { fetchRecentGames, linkGame } from './games.mjs';
 
 const OUT = new URL('../src/data/digest.json', import.meta.url);
 const PAGES = new URL('../docs/digest.json', import.meta.url);
@@ -281,12 +282,33 @@ try {
   console.warn(`ranking FIDE: ${e.message}`);
 }
 
-// 5) Grava (mantém só traduções de itens que ainda estão nos feeds)
+// 5) Partidas do dia (transmissões do Lichess) com a posição decisiva; se falhar, mantém as anteriores
+const topSurnames = players.filter((p) => p.list === 'open').map((p) => p.aliases.at(-1).toLowerCase());
+let games = prev.games ?? [];
+let allGames = games;
+try {
+  ({ featured: games, all: allGames } = await fetchRecentGames({ topSurnames }));
+} catch (e) {
+  console.warn(`partidas: ${e.message}`);
+}
+
+// 6) Grava (mantém só traduções de itens que ainda estão nos feeds)
 const keep = Object.fromEntries(fresh.filter((i) => pt[i.id]).map((i) => [i.id, pt[i.id]]));
 // se nada passou (IA fora do ar), mantém a edição anterior em vez de publicar vazio
 const stories = verified.length ? verified : (prev.stories ?? []).filter((s) => s.points);
-const digest = { generatedAt: new Date().toISOString(), model: [...used].join(', '), feed: fresh, items: keep, stories, players };
+
+// liga cada história à partida de que ela fala (jogadores ou seleções citados nas fontes)
+for (const st of stories) {
+  const text = [st.title, ...(st.points ?? []).map((p) => p.text), ...st.itemIds.map((id) => `${byId.get(id)?.title ?? ''} ${byId.get(id)?.excerpt ?? ''}`)].join(' ');
+  const match = linkGame(text, allGames, topSurnames);
+  st.gameKey = match?.key;
+  // partida citada que não estava entre as de destaque também vai no digest
+  if (match && !games.some((g) => g.key === match.key)) games.push(match);
+  if (match) console.log(`  partida ligada: ${st.title} ← ${match.white} x ${match.black}`);
+}
+
+const digest = { generatedAt: new Date().toISOString(), model: [...used].join(', '), feed: fresh, items: keep, stories, players, games };
 writeFileSync(OUT, JSON.stringify(digest));
 mkdirSync(new URL('../docs/', import.meta.url), { recursive: true });
 writeFileSync(PAGES, JSON.stringify(digest));
-console.log(`pronto: ${Object.keys(keep).length} manchetes em PT, ${stories.length} histórias checadas (IAs: ${[...used].join(', ')})`);
+console.log(`pronto: ${Object.keys(keep).length} manchetes em PT, ${stories.length} histórias checadas, ${games.length} partidas (IAs: ${[...used].join(', ')})`);

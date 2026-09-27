@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MiniBoard } from '@/components/MiniBoard';
 import { SaveButton, SourceTag, SpoilerTitle, openExternal } from '@/components/ui';
 import { useArticles } from '@/lib/digest';
+import { useGame } from '@/lib/games';
 import { useStore } from '@/lib/store';
 import { font, radius, usePalette } from '@/lib/theme';
 
@@ -16,6 +17,7 @@ export default function Story() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { settings, revealed, reveal } = useStore();
   const a = useArticles().find((x) => x.id === id);
+  const game = useGame(a?.game?.key);
   if (!a) return null;
 
   const hidden = settings.antiSpoiler && a.spoiler && !revealed.has(a.id);
@@ -57,24 +59,19 @@ export default function Story() {
             ) : null
           )}
           <Text style={[styles.meta, { color: c.muted }]}>
-            Resumo Chess Codex · {new Set(a.coverage.map((x) => x.source)).size} fontes · {a.minutes} min
+            Chess Codex · {new Set(a.coverage.map((x) => x.source)).size === 1 ? "1 fonte" : `${new Set(a.coverage.map((x) => x.source)).size} fontes`} · {a.minutes} min
           </Text>
         </View>
 
+        {game ? (
+          <View style={{ gap: 10 }}>
+            <Text style={[styles.blockLabel, { color: c.whisky }]}>ANÁLISE CHESS CODEX · A PARTIDA</Text>
+            <MiniBoard game={game} ply={a.game?.ply} caption={a.game?.caption} />
+          </View>
+        ) : null}
+
         {!hidden ? (
           <>
-            {a.points?.length ? (
-              <View style={[styles.block, { backgroundColor: c.surface, borderColor: c.hairline }]}>
-                <Text style={[styles.blockLabel, { color: c.muted }]}>O QUE CADA FONTE DIZ</Text>
-                {a.points.map((p) => (
-                  <Pressable key={p.url} onPress={() => openExternal(p.url)} style={({ pressed }) => [styles.point, { opacity: pressed ? 0.6 : 1 }]}>
-                    <SourceTag id={p.source} publisher={p.publisher} />
-                    <Text style={[styles.pointTxt, { color: c.ink, fontSize: 16 * s, lineHeight: 23 * s }]}>{p.text}</Text>
-                    <Text style={[styles.readMore, { color: c.accent }]}>Ler na fonte</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
             {a.bullets?.length ? (
             <View style={[styles.block, { backgroundColor: c.surface, borderColor: c.hairline }]}>
               <Text style={[styles.blockLabel, { color: c.muted }]}>O QUE ACONTECEU</Text>
@@ -104,10 +101,21 @@ export default function Story() {
                 <Text style={[styles.contextTxt, { color: c.inkSoft, fontSize: 16 * s, lineHeight: 24 * s }]}>{a.context}</Text>
               </View>
             ) : null}
+
+            {a.points?.length ? (
+              <View style={[styles.block, { backgroundColor: c.surface, borderColor: c.hairline }]}>
+                <Text style={[styles.blockLabel, { color: c.muted }]}>FONTES · O QUE CADA UMA PUBLICOU</Text>
+                {a.points.map((p) => (
+                  <Pressable key={p.url} onPress={() => openExternal(p.url)} style={({ pressed }) => [styles.point, { opacity: pressed ? 0.6 : 1 }]}>
+                    <SourceTag id={p.source} publisher={p.publisher} />
+                    <Text style={[styles.pointTxt, { color: c.ink, fontSize: 16 * s, lineHeight: 23 * s }]}>{p.text}</Text>
+                    <Text style={[styles.readMore, { color: c.accent }]}>Ler na fonte</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
           </>
         ) : null}
-
-        {a.game ? <MiniBoard gameKey={a.game.key} ply={a.game.ply} caption={a.game.caption} /> : null}
 
         {a.points?.length ? null : (
         <View style={{ gap: 4 }}>

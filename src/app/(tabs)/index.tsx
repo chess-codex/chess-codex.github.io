@@ -6,7 +6,9 @@ import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View
 import { FeedRow, MicroCard, ScreenHeader, SectionTitle } from '@/components/ui';
 import { EDITION } from '@/data/edition';
 import { mentions } from '@/data/players';
+import { GameCard } from '@/components/GameCard';
 import { useArticles, usePlayers } from '@/lib/digest';
+import { useGames } from '@/lib/games';
 import { sourceById } from '@/data/sources';
 import type { FeedItem } from '@/lib/rss';
 import { useStore, useVisibleItems } from '@/lib/store';
@@ -17,6 +19,7 @@ export default function Today() {
   const c = usePalette();
   const { refreshing, refresh, settings, setSettings, digest } = useStore();
   const articles = useArticles();
+  const games = useGames().slice(0, 12);
   const hour = new Date().getHours();
   const label = hour < 12 ? 'Manhã' : hour < 18 ? 'Tarde' : 'Noite';
   const intro = digest.stories.length ? articles.slice(0, 3).map((a) => a.title).join(' · ') : EDITION.intro;
@@ -67,6 +70,20 @@ export default function Today() {
 
       <View style={{ height: 14 }} />
       <MicroCard a={lead} hero />
+
+      {games.length ? (
+        <>
+          <SectionTitle>Partidas do dia</SectionTitle>
+          <FlatList
+            horizontal
+            data={games}
+            keyExtractor={(g) => g.key}
+            renderItem={({ item }) => <GameCard game={item} />}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+            showsHorizontalScrollIndicator={false}
+          />
+        </>
+      ) : null}
 
       <SectionTitle>Em 1 minuto</SectionTitle>
       <FlatList

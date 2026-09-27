@@ -14,6 +14,7 @@ export type DigestStory = {
   itemIds: string[]; kicker: string; title: string; safeTitle?: string; dek: string;
   bullets?: string[]; context?: string; tag: MicroArticle['tag']; spoiler?: boolean;
   points?: { id: string; source: FeedItem['source']; publisher: string | null; text: string }[];
+  gameKey?: string;
 };
 export type Digest = {
   generatedAt: string | null;
@@ -21,6 +22,7 @@ export type Digest = {
   feed: FeedItem[];
   items: Record<string, Translation>;
   stories: DigestStory[];
+  games?: unknown[];
   players?: Player[];
 };
 
@@ -50,6 +52,7 @@ export function useArticles(): MicroArticle[] {
         minutes: 1,
         publishedAt: refs[0]?.publishedAt ?? digest.generatedAt ?? '',
         spoiler: !!s.spoiler,
+        game: s.gameKey ? { key: s.gameKey } : undefined,
       };
     });
   }, [digest, items]);
