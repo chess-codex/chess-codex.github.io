@@ -1,0 +1,51 @@
+# Robô de redação + site: a cada 3 horas baixa os feeds, gera o digest com IA,
+# monta o site (mesmo código do app) e publica tudo no GitHub Pages. Custo zero.
+# Configurar: Settings > Secrets > Actions > GROQ_API_KEY (e opcional NVIDIA_API_KEY),
+# e Settings > Pages > Source: GitHub Actions.
+name: digest
+
+on:
+  schedule:
+    - cron: '15 */3 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # restaura o digest anterior para só traduzir itens novos
+      - run: curl -fsSL "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/digest.json" -o src/data/digest.json || true
+      - run: node scripts/digest.mjs
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      # site: exporta o app para web já com o digest novo embutido
+      - run: npx expo export -p web
+      - run: cp docs/* dist/ && cp dist/index.html dist/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4

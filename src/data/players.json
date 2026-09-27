@@ -1,0 +1,184 @@
+{
+ "updatedAt": "2026-09-26",
+ "players": [
+  {
+   "id": "open-carlsen",
+   "name": "Magnus Carlsen",
+   "aliases": [
+    "Magnus Carlsen",
+    "Carlsen"
+   ],
+   "rank": 1,
+   "country": "NOR",
+   "rating": 2823,
+   "list": "open"
+  },
+  {
+   "id": "open-nakamura",
+   "name": "Hikaru Nakamura",
+   "aliases": [
+    "Hikaru Nakamura",
+    "Nakamura"
+   ],
+   "rank": 2,
+   "country": "USA",
+   "rating": 2792,
+   "list": "open"
+  },
+  {
+   "id": "open-caruana",
+   "name": "Fabiano Caruana",
+   "aliases": [
+    "Fabiano Caruana",
+    "Caruana"
+   ],
+   "rank": 3,
+   "country": "USA",
+   "rating": 2789,
+   "list": "open"
+  },
+  {
+   "id": "open-sindarov",
+   "name": "Javokhir Sindarov",
+   "aliases": [
+    "Javokhir Sindarov",
+    "Sindarov"
+   ],
+   "rank": 4,
+   "country": "UZB",
+   "rating": 2778,
+   "list": "open"
+  },
+  {
+   "id": "open-so",
+   "name": "Wesley So",
+   "aliases": [
+    "Wesley So"
+   ],
+   "rank": 5,
+   "country": "USA",
+   "rating": 2774,
+   "list": "open"
+  },
+  {
+   "id": "open-keymer",
+   "name": "Vincent Keymer",
+   "aliases": [
+    "Vincent Keymer",
+    "Keymer"
+   ],
+   "rank": 6,
+   "country": "GER",
+   "rating": 2764,
+   "list": "open"
+  },
+  {
+   "id": "open-abdusattorov",
+   "name": "Nodirbek Abdusattorov",
+   "aliases": [
+    "Nodirbek Abdusattorov",
+    "Abdusattorov"
+   ],
+   "rank": 7,
+   "country": "UZB",
+   "rating": 2762,
+   "list": "open"
+  },
+  {
+   "id": "open-praggnanandhaa",
+   "name": "Praggnanandhaa",
+   "aliases": [
+    "Praggnanandhaa",
+    "Pragg"
+   ],
+   "rank": 8,
+   "country": "IND",
+   "rating": 2761,
+   "list": "open"
+  },
+  {
+   "id": "open-erigaisi",
+   "name": "Arjun Erigaisi",
+   "aliases": [
+    "Arjun Erigaisi",
+    "Erigaisi"
+   ],
+   "rank": 9,
+   "country": "IND",
+   "rating": 2759,
+   "list": "open"
+  },
+  {
+   "id": "open-giri",
+   "name": "Anish Giri",
+   "aliases": [
+    "Anish Giri",
+    "Giri"
+   ],
+   "rank": 10,
+   "country": "NED",
+   "rating": 2757,
+   "list": "open"
+  },
+  {
+   "id": "women-hou",
+   "name": "Hou Yifan",
+   "aliases": [
+    "Hou Yifan",
+    "Yifan Hou"
+   ],
+   "rank": 1,
+   "country": "CHN",
+   "rating": 2596,
+   "list": "women"
+  },
+  {
+   "id": "women-ju",
+   "name": "Ju Wenjun",
+   "aliases": [
+    "Ju Wenjun",
+    "Wenjun Ju"
+   ],
+   "rank": 2,
+   "country": "CHN",
+   "rating": 2553,
+   "list": "women"
+  },
+  {
+   "id": "women-lei",
+   "name": "Lei Tingjie",
+   "aliases": [
+    "Lei Tingjie",
+    "Tingjie Lei"
+   ],
+   "rank": 3,
+   "country": "CHN",
+   "rating": 2552,
+   "list": "women"
+  },
+  {
+   "id": "women-zhu",
+   "name": "Zhu Jiner",
+   "aliases": [
+    "Zhu Jiner",
+    "Jiner Zhu"
+   ],
+   "rank": 4,
+   "country": "CHN",
+   "rating": 2550,
+   "list": "women"
+  },
+  {
+   "id": "women-assaubayeva",
+   "name": "Bibisara Assaubayeva",
+   "aliases": [
+    "Bibisara Assaubayeva",
+    "Assaubayeva"
+   ],
+   "rank": 5,
+   "country": "KAZ",
+   "rating": 2536,
+   "list": "women"
+  }
+ ]
+}

@@ -1,17 +1,20 @@
 {
   "expo": {
-    "name": "mobilenews",
-    "slug": "mobilenews",
-    "version": "1.0.0",
+    "name": "Chess Codex",
+    "slug": "chess-codex-news",
+    "scheme": "chesscodex",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.chesscodex.news"
     },
     "android": {
+      "package": "br.com.chesscodex.news",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#273B5C",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -19,7 +22,33 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "name": "Chess Codex",
+      "shortName": "Chess Codex",
+      "description": "Notícias de xadrez em português: Chess.com, Lichess, FIDE e mais em um só lugar.",
+      "themeColor": "#070B14",
+      "backgroundColor": "#070B14"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#273B5C"
+        }
+      ],
+      "expo-status-bar",
+      "expo-web-browser",
+      "expo-image",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "baseUrl": "/chess-codex"
     }
   }
 }
