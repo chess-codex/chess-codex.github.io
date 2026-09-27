@@ -98,7 +98,7 @@ const GLOSSARY = `Glossário de xadrez (obrigatório):
 - Brancas (white) e pretas (black) nunca podem ser trocadas.`;
 
 // palavras de resultado que não podem aparecer no rótulo pequeno da história
-const RESULT_WORDS = /(ouro|prata|bronze|medalh\w*|venc\w*|derrot\w*|campe\w*|vitória|empat\w*|lidera\w*|elimina\w*|gold|silver|win\w*|beat\w*)|\d\s*[,.½]?\s*[-–x]\s*\d/i;
+const RESULT_WORDS = /\b(ouro|prata|bronze|medalh\w*|venc\w*|derrot\w*|campe\w*|vitória|empat\w*|lidera\w*|elimina\w*|gold|silver|win\w*|beat\w*)\b|\d\s*[,.½]?\s*[-–x]\s*\d/i;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const errText = (e) => String(e?.message ?? e);
