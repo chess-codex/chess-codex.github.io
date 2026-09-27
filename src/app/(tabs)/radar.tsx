@@ -14,10 +14,10 @@ type Filter = 'tudo' | 'regiao' | 'jogadores' | 'ciencia' | 'video' | 'comunidad
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'tudo', label: 'Tudo' },
-  { id: 'jogadores', label: 'Jogadores' },
-  { id: 'ciencia', label: 'Ciência e cultura' },
   { id: 'video', label: 'Vídeos' },
+  { id: 'jogadores', label: 'Jogadores' },
   { id: 'polemica', label: 'Polêmicas' },
+  { id: 'ciencia', label: 'Curiosidades' },
   { id: 'comunidade', label: 'Comunidade' },
 ];
 
