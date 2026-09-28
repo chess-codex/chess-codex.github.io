@@ -44,6 +44,7 @@ const AI_TIMEOUT = 90_000;
 // texto aos 17 min, abaixo dos 20 do passo no workflow. O que não coube fica para a próxima execução.
 const T0 = Date.now();
 const TEXT_MINUTES = 9;
+const ARTICLE_MINUTES = 5;
 const RUN_MINUTES = 17;
 let textT0 = null;
 // Tokens do texto próprio (conferência dos resumos curtos, 7a e 7b), contados pelo usage real de
@@ -899,6 +900,11 @@ try {
   let tried = 0;
   for (const it of candidates) {
     if (textStop()) break;
+    // os destaques do Hoje (histórias, passo 7b) vêm depois: as matérias param aos 5 min do texto
+    if (Date.now() - textT0 > ARTICLE_MINUTES * 60_000) {
+      console.log(`resumos das matérias parados aos ${ARTICLE_MINUTES} min: o resto do tempo é dos destaques`);
+      break;
+    }
     // conta tentativas, não sucessos: o limite existe para proteger a cota de tokens
     if (tried >= MAX_ARTICLES) break;
     if (textSpent() + estimate() + storyReserve > runBudget) {
@@ -921,7 +927,7 @@ try {
       }
       const srcWords = text.split(/\s+/).length;
       // matéria muito curta: o resumo acabaria virando a tradução dela inteira
-      if (srcWords < 120) {
+      if (srcWords < 60) {
         remember(it);
         console.log(`  resumo pulado (matéria curta, ${srcWords} palavras): ${label}`);
         continue;
@@ -982,7 +988,12 @@ try {
       // literal pega a tradução quase palavra por palavra de frase longa; copiedRun, a cópia de fonte em português
       const literal = list.map((x, n) => isLiteral(checks[n], x.s));
       const copied = list.map((x) => copiedRun(x.s, reference));
-      const pass = list.map((x, n) => checks[n].v && !literal[n] && !copied[n]);
+      // uma frase quase traduzida num resumo é normal (o fato é o mesmo); mais de um terço = tradução
+      if (howMany(literal) > list.length / 3) {
+        discard(`tradução, não resumo: ${howMany(literal)}/${list.length} frases literais; ${byLine(writer)}; ${cost()} tokens`);
+        continue;
+      }
+      const pass = list.map((x, n) => checks[n].v && !copied[n]);
       const mask = keepMask(list, pass);
       const kept = mask.filter(Boolean).length;
       // o que a checagem apontou, para calibrar (inclusive "literal" em frase curta, que não conta)
