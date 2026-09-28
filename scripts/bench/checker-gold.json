@@ -1,0 +1,696 @@
+{
+ "note": "Frases nossas (PT) com rótulo conferido por 3 revisores contra a referência que o robô extrai; o texto das matérias não fica aqui: o teste baixa na hora.",
+ "cases": [
+  {
+   "id": "fide-1",
+   "url": "https://www.fide.com/timur-turlov-elected-president-of-fide/",
+   "source": "FIDE",
+   "title": "Timur Turlov elected President of FIDE",
+   "sentences": [
+    {
+     "texto": "Timur Turlov, presidente da Federação de Xadrez do Cazaquistão, foi eleito presidente da FIDE em 26 de setembro, na Assembleia Geral realizada paralelamente à 46ª Olimpíada de Xadrez, em Samarcanda, no Uzbequistão.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "No primeiro turno da eleição da FIDE, Timur Turlov recebeu 96 votos, contra 76 de Wadim Rosenstein e 20 de Jan Henric Buettner, ambos da Alemanha.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Após o resultado, Timur Turlov declarou: “Somos todos uma família e continuaremos trabalhando como uma só.”",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Timur Turlov sucede Arkady Dvorkovich, que cumpriu dois mandatos como presidente da FIDE, de 2018 a 2026.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Aos 38 anos, Timur Turlov se torna o segundo presidente mais jovem já eleito da FIDE e é CEO da Freedom Holding Corp., grupo listado na bolsa NASDAQ.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "No segundo turno, realizado duas horas depois do primeiro, Timur Turlov venceu a eleição da FIDE por 110 votos a 76.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "“Somos todos uma família, e todos compartilhamos o mesmo objetivo: que o xadrez seja maior, melhor e mais forte no mundo”, disse Timur Turlov após ser eleito presidente da FIDE.",
+     "expected": false,
+     "trap": "wrong_attribution"
+    },
+    {
+     "texto": "Aos 38 anos, Timur Turlov se torna o presidente mais jovem da história da FIDE.",
+     "expected": false,
+     "trap": "first_time_record"
+    },
+    {
+     "texto": "Antes de presidir a FIDE, Arkady Dvorkovich, antecessor de Timur Turlov, foi vice-primeiro-ministro da Rússia.",
+     "expected": false,
+     "trap": "outside_knowledge"
+    },
+    {
+     "texto": "O primeiro-ministro do Uzbequistão, Abdulla Aripov, saudou os presentes e afirmou: “O xadrez é a ponte que une o nosso país ao mundo.”",
+     "expected": false,
+     "trap": "fake_quote"
+    }
+   ]
+  },
+  {
+   "id": "fide-2",
+   "url": "https://www.fide.com/uzbekistans-dream-finish-olympiad-gold-in-samarkand/",
+   "source": "FIDE",
+   "title": "Uzbekistan’s dream finish: Olympiad gold in Samarkand",
+   "sentences": [
+    {
+     "texto": "O Uzbequistão conquistou o ouro no aberto da Olimpíada de Xadrez de 2026, em Samarcanda, ao vencer a Ucrânia por 2,5 a 1,5 na última rodada, garantindo seu segundo título olímpico depois de Chennai 2022.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "No aberto da Olimpíada de 2026, a Índia ficou com a prata após empatar em 2 a 2 com a Hungria, enquanto a Alemanha levou o bronze ao derrotar os Países Baixos por 2,5 a 1,5.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Timur Turlov, recém-eleito oitavo presidente da FIDE, fez o lance inaugural simbólico 1.e4 no tabuleiro de Nodirbek Abdusattorov.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Reserva do Uzbequistão, Mukhiddin Madaminov marcou o ponto decisivo no tabuleiro quatro contra a Ucrânia e terminou a Olimpíada invicto, com 5,5 de 7.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "O GM Tin Jingyao, de Singapura, recebeu o Prêmio Fair Play Svetozar Gligoric por ter aberto mão de uma vitória por W.O. na Copa Almaty Qonayev de 2025, deixando jogar o adversário que se atrasara por causa do trânsito.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "No empate da Índia com a Hungria, Arjun Erigaisi venceu Peter Leko com as peças brancas no tabuleiro dois.",
+     "expected": false,
+     "trap": "swapped_colors"
+    },
+    {
+     "texto": "No duelo entre Índia e Hungria, o campeão mundial Gukesh D derrotou Gleb Dudin no tabuleiro quatro.",
+     "expected": false,
+     "trap": "swapped_result"
+    },
+    {
+     "texto": "Nodirbek Abdusattorov conquistou a medalha de ouro individual no primeiro tabuleiro, com performance rating de 2896.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "Nodirbek Abdusattorov pressionou num final de bispos com um peão a mais, mas deixou a vitória escapar no fim por estar em apuros no relógio.",
+     "expected": false,
+     "trap": "invented_detail"
+    },
+    {
+     "texto": "As três equipes medalhistas do aberto terminaram as onze rodadas da Olimpíada sem sofrer nenhuma derrota.",
+     "expected": false,
+     "trap": "overgeneralization"
+    }
+   ]
+  },
+  {
+   "id": "fide-3",
+   "url": "https://www.fide.com/inaugural-fide-excellence-awards-celebrate-the-people-and-achievements-shaping-chess-worldwide/",
+   "source": "FIDE",
+   "title": "Inaugural FIDE Excellence Awards celebrate the people and achievements shaping chess worldwide",
+   "sentences": [
+    {
+     "texto": "A primeira edição dos Prêmios de Excelência da FIDE foi entregue em Samarcanda, no Uzbequistão, paralelamente à 46ª Olimpíada de Xadrez.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Criados em 2026 como programa bienal, os Prêmios de Excelência da FIDE abrangem conquistas de setembro de 2024 a agosto de 2026.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Na cerimônia dos Prêmios de Excelência da FIDE, Viswanathan Anand disse: “Esta noite é para reconhecê-los e reconhecer seus esforços.”",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Nos Prêmios de Excelência da FIDE, Levon Aronian recebeu o prêmio de Melhor Retorno, e Yağız Kaan Erdoğmuş foi escolhido a Revelação do Ano.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "O prêmio de Melhor Equipe da FIDE foi para as seleções indianas do aberto e feminina, com destaque para a histórica dupla medalha de ouro na Olimpíada de 2024, em Budapeste.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Łukasz Turlej foi eleito o Melhor Jogador de Xadrez com Deficiência nos Prêmios de Excelência da FIDE.",
+     "expected": false,
+     "trap": "wrong_person"
+    },
+    {
+     "texto": "“Por trás de cada grande jogador, há pessoas que o apoiaram, direta ou indiretamente”, afirmou Odil Abdurakhmanov, representante do presidente do Uzbequistão para o esporte, na abertura da cerimônia.",
+     "expected": false,
+     "trap": "wrong_attribution"
+    },
+    {
+     "texto": "Após um processo aberto de indicações, o júri dos Prêmios de Excelência da FIDE pré-selecionou dez indicados em cada uma das 12 categorias.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "Viswanathan Anand, cinco vezes campeão mundial, deu as boas-vindas aos convidados e agradeceu ao governo do Uzbequistão pela hospitalidade.",
+     "expected": false,
+     "trap": "outside_knowledge"
+    },
+    {
+     "texto": "As seleções da Índia levaram o prêmio de Melhor Equipe por terem sido, em Budapeste 2024, o primeiro país a conquistar o ouro no aberto e no feminino na mesma Olimpíada.",
+     "expected": false,
+     "trap": "first_time_record"
+    }
+   ]
+  },
+  {
+   "id": "chesscom-chessbase-1",
+   "url": "https://www.chess.com/news/view/uzbekistan-china-win-2026-samarkand-chess-olympiad",
+   "source": "Chess.com",
+   "title": "🥇 Uzbekistan, China Both Win To Clinch Olympiad Gold",
+   "sentences": [
+    {
+     "texto": "O Uzbequistão conquistou em casa seu segundo ouro olímpico, na 46ª Olimpíada de Xadrez, em Samarcanda, com uma vitória por 2,5 a 1,5 sobre a Ucrânia em que Mukhiddin Madaminov foi o herói ao derrotar Roman Dehtiarov.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "O campeão mundial Gukesh perdeu para o húngaro Gleb Dudin, mas a vitória de Arjun Erigaisi sobre Peter Leko garantiu à Índia o empate no match e a medalha de prata.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Judit Polgar descreveu como “mortalmente perigosa” para as pretas a posição que Vasyl Ivanchuk obteve contra Javokhir Sindarov.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Questionado sobre seu próximo objetivo, Javokhir Sindarov respondeu: “Todo mundo sabe qual é o meu próximo trabalho!”",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "No feminino, a China venceu o Vietnã por 3 a 1 e conquistou seu sétimo ouro olímpico, com Zhu Jiner e Lu Miaoyi vencendo suas partidas finais e garantindo também medalhas de ouro individuais.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Sindarov surpreendeu a equipe de comentaristas ao pensar por 34 minutos antes de colocar o cavalo na borda do tabuleiro contra Vasyl Ivanchuk.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "A Ucrânia, 12ª cabeça de chave, chegou à última rodada depois de perder para a China na véspera, mas ainda assim deu alguns sustos no Uzbequistão.",
+     "expected": false,
+     "trap": "swapped_result"
+    },
+    {
+     "texto": "Questionado sobre sua próxima meta, Mukhiddin Madaminov respondeu: “Todo mundo sabe qual é o meu próximo trabalho!”",
+     "expected": false,
+     "trap": "wrong_attribution"
+    },
+    {
+     "texto": "Judit Polgar descreveu como “mortalmente perigosa” para as brancas a posição da partida entre Vasyl Ivanchuk e Javokhir Sindarov.",
+     "expected": false,
+     "trap": "swapped_colors"
+    },
+    {
+     "texto": "Ihor Samunenkov, de 17 anos, ficou com o ouro no tabuleiro quatro, logo à frente de Gukesh, tornando-se o mais jovem campeão desse tabuleiro na história das Olimpíadas.",
+     "expected": false,
+     "trap": "first_time_record"
+    }
+   ]
+  },
+  {
+   "id": "chesscom-chessbase-2",
+   "url": "https://www.chess.com/news/view/turlov-elected-new-fide-president-beats-rosenstein-in-2nd-round",
+   "source": "Chess.com",
+   "title": "Timur Turlov Elected FIDE President, Defeats Wadim Rosenstein 110-85",
+   "sentences": [
+    {
+     "texto": "Timur Turlov foi eleito presidente da FIDE ao derrotar o empresário alemão Wadim Rosenstein por 110 a 85 no segundo turno, durante a Assembleia Geral da entidade em Samarcanda, no Uzbequistão.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "No primeiro turno, Turlov teve 96 votos, contra 76 de Rosenstein e 20 de Jan Henric Buettner, ficando a um voto dos 97 necessários para vencer.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Dos 196 votos depositados na eleição da FIDE, quatro foram declarados inválidos, o que deixou 192 votos válidos.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Em seu breve discurso após a vitória, Timur Turlov afirmou: “Vocês sempre poderão contar comigo”.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Jan Henric Buettner, eliminado no primeiro turno junto com Malcolm Pein, disse que “uma eleição tem vencedores e perdedores, assim como uma partida de xadrez”.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Timur Turlov, bilionário cazaque de 36 anos nascido na Rússia, comandará o xadrez mundial pelos próximos quatro anos.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "Wadim Rosenstein reconheceu a derrota afirmando que “uma eleição tem vencedores e perdedores, assim como uma partida de xadrez”.",
+     "expected": false,
+     "trap": "wrong_attribution"
+    },
+    {
+     "texto": "Buettner e Pein apoiaram Turlov no segundo turno após um acordo que lhes garantia assentos no Conselho da FIDE.",
+     "expected": false,
+     "trap": "invented_detail"
+    },
+    {
+     "texto": "Malcolm Pein, organizador do London Chess Classic, era o companheiro de chapa de Buettner e foi eliminado com ele no primeiro turno.",
+     "expected": false,
+     "trap": "outside_knowledge"
+    },
+    {
+     "texto": "Em sua conta no X, Timur Turlov escreveu: “Hoje é uma vitória do Cazaquistão e de todo o xadrez asiático”.",
+     "expected": false,
+     "trap": "fake_quote"
+    }
+   ]
+  },
+  {
+   "id": "chesscom-chessbase-3",
+   "url": "https://en.chessbase.com/post/chess-olympiad-2026-10",
+   "source": "ChessBase",
+   "title": "Samarkand R10 (open): Uzbekistan enter final round with one-point lead over India",
+   "sentences": [
+    {
+     "texto": "Anfitrião da Olimpíada, o Uzbequistão venceu a Armênia por 3,5 a 0,5 e chega à última rodada com um ponto de vantagem sobre a Índia, que derrotou o Uzbequistão 2 pelo mesmo placar.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Com uma rodada por jogar, o Uzbequistão soma 18 pontos de match, a Índia tem 17, e Alemanha, Ucrânia e Hungria estão com 16 cada.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Na rodada final, o Uzbequistão enfrenta a Ucrânia, a Índia pega a Hungria e a Alemanha joga contra a Holanda, que já não tem chance de terminar em primeiro.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Nodirbek Abdusattorov, único uzbeque a disputar as dez rodadas, soma 8/10 e lidera os jogadores do primeiro tabuleiro com performance de 2900.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "O campeão mundial Gukesh, que jogou todas as rodadas e fez 8,5/10, é o claro favorito ao ouro individual no tabuleiro quatro, com performance de 2797.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Até a nona rodada, a Armênia havia perdido apenas três partidas individuais, e essas derrotas só lhe custaram empates contra Estados Unidos e Holanda.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "Javokhir Sindarov ocupa o segundo lugar entre os jogadores do tabuleiro dois, atrás do alemão Frederik Svane.",
+     "expected": false,
+     "trap": "wrong_person"
+    },
+    {
+     "texto": "Atual campeã olímpica após o título em Budapeste, a Índia tinha vantagem de mais de 200 pontos de rating em três dos quatro tabuleiros contra o Uzbequistão 2.",
+     "expected": false,
+     "trap": "outside_knowledge"
+    },
+    {
+     "texto": "O Uzbequistão chega à rodada final tendo vencido todos os seus dez matches na Olimpíada de Samarcanda.",
+     "expected": false,
+     "trap": "overgeneralization"
+    },
+    {
+     "texto": "A rodada decisiva começará quatro horas mais cedo do que o habitual, às 8h CEST, por causa da cerimônia de encerramento.",
+     "expected": false,
+     "trap": "invented_detail"
+    }
+   ]
+  },
+  {
+   "id": "es-lichess-1",
+   "url": "https://damasyreyes.es/yuffa-plata-olimpiada-uzbekistan/",
+   "source": "Damas y Reyes",
+   "title": "Yuffa, plata individual, lleva a España al décimo puesto en la Olimpiada, que ganó Uzbekistán",
+   "sentences": [
+    {
+     "texto": "Daniil Yuffa ganhou a medalha de prata no quinto tabuleiro da Olimpíada de Samarcanda e terminou com 7,5 pontos em 9 partidas.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Alexei Shirov escreveu no Facebook: “É um resultado razoável se levarmos em conta que nossa posição inicial era a 13ª.”",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Nascido na Rússia, Daniil Yuffa deixou o país em 2022 depois de assinar uma carta que condenava a invasão da Ucrânia.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "A China venceu o torneio feminino cedendo apenas dois empates, e Cazaquistão e Estados Unidos ficaram com as outras duas medalhas.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Na Copa Gaprindashvili, que considera a classificação combinada, a Espanha terminou em 17º lugar, e Índia, Estados Unidos e China ocuparam as três primeiras posições.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Depois de um ano difícil em que perdeu quase 200 pontos de rating, Daniil Yuffa recuperou a forma em Samarcanda e foi o melhor espanhol.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "Alexei Shirov escreveu no Facebook: “Com um bom arranque final, poderíamos ter terminado perto do pódio.”",
+     "expected": false,
+     "trap": "fake_quote"
+    },
+    {
+     "texto": "Maksim Chigaev admitiu: “Infelizmente, o ponto mais fraco da equipe fui eu.”",
+     "expected": false,
+     "trap": "wrong_attribution"
+    },
+    {
+     "texto": "Alexei Shirov, que fez 4 pontos em 7 partidas, contou ter jogado por decisão própria muitas partidas com as peças brancas.",
+     "expected": false,
+     "trap": "swapped_colors"
+    },
+    {
+     "texto": "O Uzbequistão conquistou em casa seu segundo ouro olímpico, depois do triunfo em Chennai, em 2022.",
+     "expected": false,
+     "trap": "outside_knowledge"
+    }
+   ]
+  },
+  {
+   "id": "es-lichess-2",
+   "url": "https://lichess.org/@/Lichess/blog/2026-samarkand-olympiad-rounds-10-11-uzbekistan-china-win-open-womens/W0x2a9bz",
+   "source": "Lichess",
+   "title": "2026 Samarkand Olympiad Rounds 10–11: Uzbekistan, China Win Open, Women’s",
+   "sentences": [
+    {
+     "texto": "O Uzbequistão venceu o torneio aberto da Olimpíada de Samarcanda com 20 de 22 pontos de match, com a Índia ficando com a prata e a Alemanha com o bronze.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "No torneio feminino, a China foi campeã com 20 pontos de match, dois à frente do Cazaquistão, enquanto a Índia terminou em terceiro com 17.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "O Uzbequistão derrotou a Armênia por 3,5 a 0,5 na rodada 10 e a Ucrânia por 2,5 a 1,5 na rodada 11.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Nodirbek Abdusattorov venceu Haik Martirosyan em um final de bispos de cores opostas, jogando com incrível precisão.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "A Índia ficou com a prata após derrotar o Uzbequistão 2 por 3,5 a 0,5 na rodada 10 e vencer a Hungria por pouco na rodada 11.",
+     "expected": false,
+     "trap": "swapped_result"
+    },
+    {
+     "texto": "Com 20 de 22 pontos de match, o Uzbequistão conquistou em Samarcanda o primeiro título olímpico de sua história.",
+     "expected": false,
+     "trap": "first_time_record"
+    },
+    {
+     "texto": "Jogando com as peças brancas, Nodirbek Abdusattorov chegou a ficar em ligeira desvantagem contra Haik Martirosyan antes de vencer.",
+     "expected": false,
+     "trap": "swapped_colors"
+    },
+    {
+     "texto": "Na rodada 10, Robert Hovhannisyan errou com 28. a5?, o que deu a Javokhir Sindarov a chance de voltar à partida.",
+     "expected": false,
+     "trap": "wrong_person"
+    },
+    {
+     "texto": "Invicto em todo o torneio, o Uzbequistão garantiu o ouro no aberto com uma vitória apertada por 2,5 a 1,5 sobre a Ucrânia na última rodada.",
+     "expected": false,
+     "trap": "overgeneralization"
+    }
+   ]
+  },
+  {
+   "id": "es-lichess-3",
+   "url": "https://www.fide.com/olympiad-day-10-uzbekistan-in-command-as-medal-race-goes-to-the-wire/",
+   "source": "FIDE",
+   "title": "Olympiad Day 10: Uzbekistan in command as medal race goes to the wire",
+   "sentences": [
+    {
+     "texto": "Timur Turlov venceu a eleição presidencial da FIDE no segundo turno, com 110 votos contra 85 de Wadim Rosenstein.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "O árbitro principal Ivan Syrovy anunciou no início da rodada que Timur Turlov havia vencido a eleição e se tornado o oitavo presidente da FIDE.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Após a rodada 10, o Uzbequistão ficou um ponto de match à frente da Índia, com vantagem de 30 pontos no critério de desempate.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Segundo a FIDE, Nodirbek Abdusattorov está jogando o melhor xadrez de sua vida, invicto e com 8 de 10 pontos.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "No feminino, o Vietnã venceu seu quarto match seguido ao superar a Indonésia por 2,5 a 1,5, mantendo uma chance remota de medalha.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Com 110 votos no segundo turno, Timur Turlov tornou-se o sétimo presidente da história da FIDE.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "Nihal Sarin abriu o placar para a Índia no terceiro tabuleiro ao vencer Mukhammadzokhid Suyarov com as peças brancas.",
+     "expected": false,
+     "trap": "swapped_colors"
+    },
+    {
+     "texto": "Hussein Abdullah Al-Khoury fez o lance cerimonial 1.e4 para Haik Martirosyan, primeiro tabuleiro da Armênia.",
+     "expected": false,
+     "trap": "wrong_person"
+    },
+    {
+     "texto": "Nodirbek Abdusattorov trocou o lance cerimonial 1…c6 pela Defesa Escandinava por orientação do capitão da equipe uzbeque.",
+     "expected": false,
+     "trap": "invented_detail"
+    },
+    {
+     "texto": "A 47ª Olimpíada de Xadrez da FIDE será disputada nos Emirados Árabes Unidos em 2028.",
+     "expected": false,
+     "trap": "outside_knowledge"
+    }
+   ]
+  },
+  {
+   "id": "misc-1",
+   "url": "https://www.chess.com/news/view/carlsen-maghsoodloo-ashraf-3-0-thursday-09-24-2026",
+   "source": "Chess.com",
+   "title": "Heartbreak For Minh Le, Victories For Carlsen, Maghsoodloo, Ashraf In 3 0 Thursday",
+   "sentences": [
+    {
+     "texto": "Magnus Carlsen e Hikaru Nakamura, que não estão disputando a Olimpíada, jogaram o primeiro torneio do 3 0 Thursday de 24 de setembro.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Carlsen abriu o primeiro torneio com oito vitórias seguidas antes de ser derrotado por Alexey Sarana.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "Carlsen ficou com o título do primeiro torneio no desempate, com a ajuda de um deslize de mouse de Tuan Minh Le na partida entre os dois pela décima rodada.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Na última rodada do primeiro torneio, Nakamura estava preparado para a surpresa de abertura de Carlsen e o derrotou por 3 a 0.",
+     "expected": false,
+     "trap": "time_control_as_score"
+    },
+    {
+     "texto": "Parham Maghsoodloo venceu as sete primeiras partidas do segundo torneio e ficou com o título por ter o melhor desempate entre três jogadores com nove pontos.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Na oitava rodada do segundo torneio, Maghsoodloo interrompeu a sequência de vitórias de Artin Ashraf.",
+     "expected": false,
+     "trap": "swapped_result"
+    },
+    {
+     "texto": "Na quinta rodada do segundo torneio, Haik Martirosyan, com as peças pretas, teve uma iniciativa perigosa contra Maghsoodloo, mas perdeu o controle da partida.",
+     "expected": false,
+     "trap": "swapped_colors"
+    },
+    {
+     "texto": "Artin Ashraf fez nove pontos no terceiro torneio e foi o único vencedor do dia a terminar isolado em primeiro lugar.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Alexey Sarana, que defende a Sérvia na Olimpíada, derrotou Carlsen na oitava rodada do primeiro torneio.",
+     "expected": false,
+     "trap": "outside_knowledge"
+    },
+    {
+     "texto": "Cada um dos três torneios semanais do 3 0 Thursday é um suíço de 11 rodadas no ritmo 3+0, com premiação combinada de US$ 3.000 por semana.",
+     "expected": true,
+     "trap": "none"
+    }
+   ]
+  },
+  {
+   "id": "misc-2",
+   "url": "https://www.theguardian.com/sport/2026/sep/25/chess-uzbekistan-and-germany-share-samarkand-lead-11-year-old-sivanandan-shines",
+   "source": "The Guardian · Chess",
+   "title": "Chess: Uzbekistan and Germany share Samarkand lead; 11-year-old Sivanandan shines",
+   "sentences": [
+    {
+     "texto": "Após oito das 11 rodadas da Olimpíada de Samarcanda, o anfitrião Uzbequistão divide a liderança do aberto com a Alemanha, ambos com 14 de 16 pontos, apesar de ter perdido para os alemães na oitava rodada.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "O turco Yagiz Kaan Erdogmus, com 6 de 7 no primeiro tabuleiro, briga pelo ouro individual e se tornou o jogador mais jovem da história a entrar no top 20 do ranking mundial.",
+     "expected": false,
+     "trap": "first_time_record"
+    },
+    {
+     "texto": "A Inglaterra perdeu duas vezes em Samarcanda: para a Índia, segunda cabeça de chave, e, na oitava rodada, para a segunda equipe do Uzbequistão, por 1,5 a 2,5.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Na sétima rodada, Dan Fernandez derrotou o campeão mundial Gukesh Dommaraju, mas a Índia venceu a Inglaterra por 2,5 a 1,5.",
+     "expected": false,
+     "trap": "swapped_result"
+    },
+    {
+     "texto": "O colunista do Guardian escreveu que “Sindarov x Erdogmus pela coroa mundial em 2030 está se tornando uma previsão plausível”.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Segundo a FIDE, um duelo entre Sindarov e Erdogmus pelo título mundial em 2030 está se tornando uma previsão plausível.",
+     "expected": false,
+     "trap": "wrong_attribution"
+    },
+    {
+     "texto": "Depois de cinco rodadas, Uzbequistão, Índia e Alemanha dividiam a liderança com pontuação máxima.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "A Olimpíada de Samarcanda, que reúne 400 equipes, é a 46ª edição da competição.",
+     "expected": false,
+     "trap": "outside_knowledge"
+    },
+    {
+     "texto": "Bodhana Sivanandan, de 11 anos, perdeu apenas uma vez no primeiro tabuleiro da equipe feminina da Inglaterra e se destacou num empate com a atual campeã europeia, da Ucrânia.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Os ingleses Michael Adams, de 54 anos, e Luke McShane, de 42, são os únicos jogadores ainda invictos após oito rodadas.",
+     "expected": false,
+     "trap": "overgeneralization"
+    }
+   ]
+  },
+  {
+   "id": "misc-3",
+   "url": "https://www.fide.com/olympiad-day-10-uzbekistan-in-command-as-medal-race-goes-to-the-wire/",
+   "source": "FIDE",
+   "title": "Olympiad Day 10: Uzbekistan in command as medal race goes to the wire",
+   "sentences": [
+    {
+     "texto": "Timur Turlov foi eleito o oitavo presidente da FIDE, com 110 votos contra 85 de Wadim Rosenstein no segundo turno da votação.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Hussein Abdullah Al-Khoury, diretor do torneio da 47ª Olimpíada, nos Emirados Árabes Unidos, anunciou no início da rodada a vitória de Timur Turlov na eleição da FIDE.",
+     "expected": false,
+     "trap": "wrong_attribution"
+    },
+    {
+     "texto": "O Uzbequistão venceu a Armênia por 3,5 a 0,5 e chega à última rodada um ponto de match à frente da Índia, com vantagem de 30 pontos no desempate.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "No feminino, as chances de medalha da Mongólia sofreram um duro golpe com a derrota por 3,5 a 0,5 para a Polônia.",
+     "expected": false,
+     "trap": "wrong_number"
+    },
+    {
+     "texto": "Segundo a FIDE, Nodirbek Abdusattorov, invicto e com 8 de 10, “está jogando o melhor xadrez de sua vida até agora”.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Em entrevista após a partida, Javokhir Sindarov afirmou: “Estamos prontos para lutar pelo ouro amanhã”.",
+     "expected": false,
+     "trap": "fake_quote"
+    },
+    {
+     "texto": "Mukhiddin Madaminov, que foi segundo de Sindarov no Torneio de Candidatos, venceu Gabriel Sargissian no quarto tabuleiro.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Nihal Sarin abriu o placar para a Índia contra o Uzbequistão 2 ao vencer Mukhammadzokhid Suyarov com as peças brancas, no terceiro tabuleiro.",
+     "expected": false,
+     "trap": "swapped_colors"
+    },
+    {
+     "texto": "No feminino, o Vietnã venceu a Indonésia por 2,5 a 1,5, sua quarta vitória seguida, e manteve viva uma chance remota de medalha.",
+     "expected": true,
+     "trap": "none"
+    },
+    {
+     "texto": "Nodirbek Abdusattorov, campeão mundial de partidas rápidas em 2021, completou a vitória uzbeque sobre a Armênia com um triunfo num longo final no primeiro tabuleiro.",
+     "expected": false,
+     "trap": "outside_knowledge"
+    }
+   ]
+  }
+ ]
+}

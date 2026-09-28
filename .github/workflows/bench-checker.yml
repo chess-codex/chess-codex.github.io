@@ -1,0 +1,32 @@
+# Teste dos checadores de fatos (scripts/bench-checker.mjs): roda só quando pedido, com as chaves
+# guardadas nos segredos do repositório. O resultado sai no log da execução.
+name: bench-checker
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: 'Modelos separados por espaço (vazio = lista padrão do script)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # a lista entra por variável de ambiente, não direto no comando (evita injeção pelo campo)
+      - run: node scripts/bench-checker.mjs $MODELS
+        env:
+          MODELS: ${{ inputs.models }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
