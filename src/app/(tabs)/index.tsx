@@ -22,6 +22,8 @@ import { longDate, timeAgo } from '@/lib/time';
 const MAX_NEWS = 20;
 // destaques no carrossel do topo: variedade sem voltar a encher a tela
 const HIGHLIGHTS = 3;
+// os destaques saem das 8 histórias mais importantes, com foto primeiro: são a capa da edição
+const HIGHLIGHT_POOL = 8;
 // o carrossel passa sozinho a cada 5 s e para por 12 s quando o leitor mexe
 const AUTO_EVERY = 5_000;
 const AUTO_PAUSE = 12_000;
@@ -69,7 +71,11 @@ export default function Today() {
       ),
     [articles, settings.hiddenSources, muted],
   );
-  const highlights = visible.slice(0, HIGHLIGHTS);
+  // com foto primeiro, na ordem de importância do robô; sem foto só completa se faltar
+  const highlights = useMemo(() => {
+    const top = visible.slice(0, HIGHLIGHT_POOL);
+    return [...top.filter((a) => a.image), ...top.filter((a) => !a.image)].slice(0, HIGHLIGHTS);
+  }, [visible]);
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
   // largura real do carrossel: na web a coluna tem teto (760), menor que a janela
@@ -156,7 +162,8 @@ export default function Today() {
       .sort((a, b) => b.score - a.score);
 
     // histórias primeiro, na ordem do robô; os destaques já estão lá em cima
-    const out: Entry[] = visible.slice(HIGHLIGHTS, HIGHLIGHTS + MAX_NEWS).map((a) => ({ story: a }));
+    const shown = new Set(highlights.map((a) => a.id));
+    const out: Entry[] = visible.filter((a) => !shown.has(a.id)).slice(0, MAX_NEWS).map((a) => ({ story: a }));
     // repetição pela manchete traduzida e pela original: o mesmo comunicado vindo de dois feeds
     // pode ganhar traduções diferentes, mas o título original é o mesmo
     const seenKeys = new Set(visible.map((a) => titleKey(a.title)));
@@ -171,7 +178,7 @@ export default function Today() {
       out.push({ item: i });
     }
     return out;
-  }, [pool, articles, visible, muted, players, settings.following, likeSnap, digest]);
+  }, [pool, articles, visible, highlights, muted, players, settings.following, likeSnap, digest]);
 
   const hour = new Date().getHours();
   const label = hour < 12 ? 'Manhã' : hour < 18 ? 'Tarde' : 'Noite';
