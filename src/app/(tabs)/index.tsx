@@ -22,6 +22,9 @@ import { longDate, timeAgo } from '@/lib/time';
 const MAX_NEWS = 20;
 // destaques no carrossel do topo: variedade sem voltar a encher a tela
 const HIGHLIGHTS = 3;
+// o carrossel passa sozinho a cada 5 s e para por 12 s quando o leitor mexe
+const AUTO_EVERY = 5_000;
+const AUTO_PAUSE = 12_000;
 const HOUR = 3_600_000;
 // bônus pequenos, medidos em horas de frescor: sobem a notícia sem enterrar a que acabou de sair
 const FOLLOW_BONUS = 6 * HOUR;
@@ -69,6 +72,31 @@ export default function Today() {
   const highlights = visible.slice(0, HIGHLIGHTS);
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
+  // largura real do carrossel: na web a coluna tem teto (760), menor que a janela
+  const [slideW, setSlideW] = useState(0);
+  const slide = slideW || width;
+  const carousel = useRef<FlatList<MicroArticle>>(null);
+  // passa sozinho para a direita; depois que o leitor mexe, espera um pouco antes de voltar a passar
+  const pausedUntil = useRef(0);
+  const pauseAuto = useCallback(() => {
+    pausedUntil.current = Date.now() + AUTO_PAUSE;
+  }, []);
+  const goTo = useCallback(
+    (i: number, byUser = false) => {
+      if (byUser) pauseAuto();
+      carousel.current?.scrollToOffset({ offset: i * slide, animated: true });
+      setPage(i);
+    },
+    [slide, pauseAuto],
+  );
+  useEffect(() => {
+    if (highlights.length < 2) return;
+    const t = setInterval(() => {
+      if (Date.now() < pausedUntil.current) return;
+      goTo((page + 1) % highlights.length);
+    }, AUTO_EVERY);
+    return () => clearInterval(t);
+  }, [page, highlights.length, goTo]);
 
   // item que já está numa história não volta solto na lista
   const inStory = useMemo(() => {
@@ -185,22 +213,39 @@ export default function Today() {
       {highlights.length ? (
         <>
           <FlatList
+            ref={carousel}
             horizontal
             pagingEnabled
             data={highlights}
             keyExtractor={(a) => a.id}
+            onLayout={(e) => setSlideW(e.nativeEvent.layout.width)}
             renderItem={({ item }) => (
-              <View style={{ width }}>
+              <View style={{ width: slide }}>
                 <MicroCard a={item} hero />
               </View>
             )}
-            onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
+            // onScroll e não onMomentumScrollEnd: na web o fim do "momentum" não dispara
+            onScroll={(e) => {
+              const p = Math.round(e.nativeEvent.contentOffset.x / slide);
+              if (p !== page) setPage(p);
+            }}
+            scrollEventThrottle={32}
+            onScrollBeginDrag={pauseAuto}
+            onTouchStart={pauseAuto}
             showsHorizontalScrollIndicator={false}
           />
           {highlights.length > 1 ? (
             <View style={styles.dots} accessibilityLabel={`Destaque ${page + 1} de ${highlights.length}`}>
               {highlights.map((a, i) => (
-                <View key={a.id} style={[styles.dot, { backgroundColor: i === page ? c.whisky : c.hairline, width: i === page ? 18 : 7 }]} />
+                <Pressable
+                  key={a.id}
+                  onPress={() => goTo(i, true)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ir para o destaque ${i + 1}`}
+                >
+                  <View style={[styles.dot, { backgroundColor: i === page ? c.whisky : c.hairline, width: i === page ? 18 : 7 }]} />
+                </Pressable>
               ))}
             </View>
           ) : null}
