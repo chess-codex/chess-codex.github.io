@@ -103,6 +103,24 @@ const GLOSSARY = `Glossário de xadrez (obrigatório):
 // palavras de resultado que não podem aparecer no rótulo pequeno da história
 const RESULT_WORDS = /\b(ouro|prata|bronze|medalh\w*|venc\w*|derrot\w*|campe\w*|vitória|empat\w*|lidera\w*|elimina\w*|gold|silver|win\w*|beat\w*)\b|\d\s*[,.½]?\s*[-–x]\s*\d/i;
 
+/** Mantém frases inteiras, na ordem, até o limite de palavras; parágrafo que fica vazio sai. */
+function trimToWords(paragraphs, max) {
+  const out = [];
+  let used = 0;
+  for (const p of paragraphs) {
+    const kept = [];
+    for (const sen of sentences(p)) {
+      const w = sen.split(/\s+/).filter(Boolean).length;
+      if (used + w > max && used > 0) break;
+      kept.push(sen);
+      used += w;
+    }
+    if (kept.length) out.push(kept.join(' '));
+    if (used >= max) break;
+  }
+  return out;
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const errText = (e) => String(e?.message ?? e);
 const used = new Set();
@@ -132,7 +150,9 @@ async function callProvider(p, system, user, maxTokens, effort) {
         model: p.model,
         temperature: 0.1,
         max_completion_tokens: maxTokens,
-        reasoning_effort: effort,
+        // o GLM da NVIDIA com raciocínio médio gasta todo o limite pensando e não entrega o JSON;
+        // no baixo ele confere certo (testado: pegou a frase inventada) e responde em segundos
+        reasoning_effort: p.name === 'nvidia' ? 'low' : effort,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: system },
@@ -893,7 +913,8 @@ try {
       );
       aiFailures = 0;
       const write = { tokens: cost(), reasoning: lastUsage?.reasoning ?? 0 };
-      const drafted = cleanList(draft?.paragraphs, 4);
+      // redator que passa do tamanho é aparado em frases inteiras (a checagem confere o que sobrou)
+      const drafted = trimToWords(cleanList(draft?.paragraphs, 4), Math.round(target * 1.2));
       const list = toSentences(drafted);
       if (list.length < 2) {
         discard(`resposta vazia; ${write.tokens} tokens`);
@@ -1032,7 +1053,7 @@ try {
       t0 = tokensUsed;
       const draft = await ai(STORY_PROMPT, `Manchete: ${st.title}\nTamanho: até ${target} palavras no "O que aconteceu".\n\nMaterial:\n${material}`, WRITE_TOKENS, 'low', STRONG);
       aiFailures = 0;
-      const drafted = cleanList(draft?.body, 3);
+      const drafted = trimToWords(cleanList(draft?.body, 3), Math.round(target * 1.2));
       const bodyList = toSentences(drafted);
       const whyList = sentences(typeof draft?.why === 'string' ? draft.why : '');
       if (bodyList.length < 2) {
