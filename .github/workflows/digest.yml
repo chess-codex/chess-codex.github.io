@@ -36,17 +36,31 @@ jobs:
           curl -fsSL "https://${{ github.repository_owner }}.github.io/digest.json" -o /tmp/prev-digest.json \
             && node -e "JSON.parse(require('fs').readFileSync('/tmp/prev-digest.json', 'utf8'))" \
             && mv /tmp/prev-digest.json src/data/digest.json || true
+      # o arquivo de edições se acumula no próprio site: restaura o publicado (mesma proteção)
+      - run: |
+          curl -fsSL "https://${{ github.repository_owner }}.github.io/arquivo.json" -o /tmp/prev-arquivo.json \
+            && node -e "JSON.parse(require('fs').readFileSync('/tmp/prev-arquivo.json', 'utf8'))" \
+            && mv /tmp/prev-arquivo.json src/data/arquivo.json || true
       # sem chave ou com a IA fora do ar, o site sai mesmo assim com o último digest
       - run: node scripts/digest.mjs
         continue-on-error: true
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      # soma a edição de hoje ao arquivo (falha aqui não segura o site)
+      - run: node scripts/archive.mjs
+        continue-on-error: true
       # site: exporta o app para web já com o digest novo embutido
       - run: npx expo export -p web
       # publica o digest mais novo que houver: com o robô ok, é igual ao docs/digest.json; se ele
       # falhou, sai o restaurado ou o do último checkpoint, nunca a cópia antiga do repositório
-      - run: cp src/data/digest.json docs/digest.json && cp docs/* dist/ && cp dist/index.html dist/404.html
+      - run: |
+          cp src/data/digest.json docs/digest.json
+          # o arquivo sai do que a execução tem (novo ou restaurado): histórico nunca some por falha
+          if [ -f src/data/arquivo.json ]; then cp src/data/arquivo.json docs/arquivo.json; fi
+          cp docs/* dist/
+      # prévia do link (WhatsApp, Telegram, X, Google) e página de reserva para links diretos
+      - run: node scripts/seo.mjs && cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

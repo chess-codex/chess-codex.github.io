@@ -44,3 +44,7 @@ yarn-error.*
 .site/
 dist/
 .claude/launch.json
+
+# arquivo de edições: vive no site (GitHub Pages), o robô restaura e acumula
+src/data/arquivo.json
+docs/arquivo.json

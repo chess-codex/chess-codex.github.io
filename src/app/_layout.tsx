@@ -47,6 +47,7 @@ function AppStack() {
         <Stack.Screen name="story/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="read/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="game/[key]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="arquivo" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>
       </View>

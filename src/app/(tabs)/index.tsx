@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
@@ -12,7 +12,7 @@ import { useArticles, usePlayers } from '@/lib/digest';
 import { useGames } from '@/lib/games';
 import type { FeedItem } from '@/lib/rss';
 import { categoryKey, useStore, useVisibleItems } from '@/lib/store';
-import { font, usePalette } from '@/lib/theme';
+import { font, radius, usePalette } from '@/lib/theme';
 import { longDate, timeAgo } from '@/lib/time';
 
 // Hoje é a nossa edição: destaque, Notícias do dia com texto nosso e as partidas.
@@ -231,11 +231,20 @@ export default function Today() {
           </View>
         </>
       ) : null}
+
+      {/* edições dos dias anteriores, guardadas pelo robô no próprio site */}
+      <Pressable onPress={() => router.push('/arquivo')} style={[styles.archive, { borderColor: c.hairline }]} accessibilityRole="button">
+        <Ionicons name="albums-outline" size={18} color={c.whisky} />
+        <Text style={[styles.archiveTxt, { color: c.ink }]}>Edições anteriores</Text>
+        <Ionicons name="chevron-forward" size={16} color={c.muted} />
+      </Pressable>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  archive: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 24, padding: 14, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth },
+  archiveTxt: { flex: 1, fontFamily: font.semibold, fontSize: 15 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 12 },
   dot: { height: 7, borderRadius: 4 },
   edition: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 20, marginTop: -4, marginBottom: 14 },

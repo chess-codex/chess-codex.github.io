@@ -8,6 +8,8 @@ export const SITE_URL = 'https://chess-codex.github.io';
 
 const baseUrl = (Constants.expoConfig?.experiments?.baseUrl ?? '').replace(/\/$/, '');
 export const DIGEST_URL = Platform.OS === 'web' ? `${baseUrl}/digest.json` : `${SITE_URL}/digest.json`;
+// edições anteriores (scripts/archive.mjs), no mesmo lugar do digest
+export const ARQUIVO_URL = Platform.OS === 'web' ? `${baseUrl}/arquivo.json` : `${SITE_URL}/arquivo.json`;
 
 // Estatísticas de uso (PostHog, região UE). Chave vazia = nada sai do aparelho.
 // A chave de projeto do PostHog é pública por natureza (só envia eventos). Todo evento
