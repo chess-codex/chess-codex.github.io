@@ -5,10 +5,12 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GameStory, MiniBoard } from '@/components/MiniBoard';
 import { LikeButton, ReadBadge, SPOILER_BLUR, SaveButton, ShareButton, SourceTag, openExternal } from '@/components/ui';
 import { sourceById } from '@/data/sources';
 import { track } from '@/lib/analytics';
 import { useArticleText, useTranslation } from '@/lib/digest';
+import { useGame } from '@/lib/games';
 import { safeOrNull, useSpoilerHidden } from '@/lib/spoiler';
 import { useStore } from '@/lib/store';
 import { font, radius, usePalette } from '@/lib/theme';
@@ -32,6 +34,7 @@ export default function Read() {
   const item = found ?? first;
   const text = freshText ?? firstText;
   const robot = digest.items[id];
+  const game = useGame(robot?.gameKey);
   const title = tr?.title ?? item?.title ?? '';
   // a marca do robô vale com ou sem tradução ligada; a regra é a mesma da manchete na lista
   const hidden = useSpoilerHidden(id, title, robot?.spoiler);
@@ -67,7 +70,8 @@ export default function Read() {
   const safe = robot?.spoiler ? safeOrNull(robot.safeTitle, robot.title) : null;
   // resumo curto da IA só depois de conferido com a fonte; sem isso, vale o trecho da própria fonte
   // resumo curto em PT já aparece; se a conferência reprovar, o robô troca pelo título traduzido
-  const shortSummary = tr?.summary ?? '';
+  // resumo que só repete a manchete não conta como texto
+  const shortSummary = tr?.summary && tr.summary.trim() !== title.trim() ? tr.summary : '';
   const titleStyle = [styles.title, { color: c.ink, fontSize: 27 * s, lineHeight: 33 * s }];
   const paraStyle = [styles.para, { color: c.ink, fontSize: 17 * s, lineHeight: 26 * s }];
   const cta =
@@ -132,7 +136,7 @@ export default function Read() {
             <Text style={paraStyle}>{shortSummary}</Text>
             <Text style={[styles.note, { color: c.muted, borderTopColor: c.hairline }]}>Resumo curto. A matéria completa está na fonte.</Text>
           </View>
-        ) : item.excerpt ? (
+        ) : game ? null : item.excerpt ? (
           // trecho literal da fonte: entre aspas e com o nome de quem publicou, não como texto nosso
           <View style={{ gap: 14 }}>
             <Text style={[paraStyle, { color: c.inkSoft }]}>“{item.excerpt}”</Text>
@@ -143,6 +147,15 @@ export default function Read() {
         ) : (
           <Text style={[styles.note, { color: c.muted, borderTopColor: c.hairline }]}>A matéria completa está na fonte.</Text>
         )}
+
+        {/* a partida de que a notícia fala: relato, lance decisivo e tabuleiro (Anti-Spoiler vale aqui também) */}
+        {game ? (
+          <View style={{ gap: 10 }}>
+            <Text style={[styles.blockLabel, { color: c.whisky }]}>ANÁLISE CHESS CODEX · A PARTIDA</Text>
+            <GameStory game={game} onReveal={() => reveal(item.id)} />
+            <MiniBoard game={game} onReveal={() => reveal(item.id)} />
+          </View>
+        ) : null}
 
         <Pressable
           onPress={() => openExternal(item.url)}
@@ -163,6 +176,7 @@ const styles = StyleSheet.create({
   barTxt: { fontFamily: font.medium, fontSize: 16 },
   barRight: { flexDirection: 'row', alignItems: 'center', gap: 20, paddingRight: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  blockLabel: { fontFamily: font.bold, fontSize: 11, letterSpacing: 1.2 },
   title: { fontFamily: font.black, letterSpacing: -0.6 },
   veil: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, alignSelf: 'flex-start' },
   veilTxt: { fontFamily: font.medium, fontSize: 13.5, flexShrink: 1 },

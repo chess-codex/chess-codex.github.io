@@ -615,6 +615,29 @@ try {
   console.warn(`partidas: ${errText(e)}`);
 }
 
+// 5b) Liga a partida também às notícias avulsas das Notícias do dia (as histórias são ligadas mais
+// abaixo): a página da notícia mostra o tabuleiro, o lance decisivo e o relato do Stockfish
+{
+  let linked = 0;
+  for (const i of fresh) {
+    const tr = pt[i.id];
+    if (!tr || tr.relevant === false || !['jornal', 'geral'].includes(KIND.get(i.source))) continue;
+    try {
+      const match = linkGame(`${i.title} ${i.excerpt} ${tr.title ?? ''} ${tr.summary ?? ''}`, allGames, topSurnames, i.publishedAt);
+      if (!match) {
+        delete tr.gameKey;
+        continue;
+      }
+      tr.gameKey = match.key;
+      if (!games.some((g) => g.key === match.key)) games.push(match);
+      linked++;
+    } catch (e) {
+      console.warn(`  partida não ligada: ${i.title} (${errText(e).slice(0, 80)})`);
+    }
+  }
+  if (linked) console.log(`partidas ligadas a ${linked} notícias`);
+}
+
 // 6) Grava (mantém só traduções de itens que ainda estão nos feeds)
 // manchetes e resumos curtos também passam pela revisão de grafia (Uzbekistan → Uzbequistão etc.)
 const spell = (t) => (typeof t === 'string' ? fixSpelling(t) : t);
@@ -645,7 +668,9 @@ const stories = verified.length
 for (const st of stories) {
   try {
     const text = [st.title, ...(st.points ?? []).map((p) => p.text), ...(st.itemIds ?? []).map((id) => `${byId.get(id)?.title ?? ''} ${byId.get(id)?.excerpt ?? ''}`)].join(' ');
-    const match = linkGame(text, allGames, topSurnames);
+    // a data vale pela fonte mais nova da história
+    const newest = (st.itemIds ?? []).map((id) => byId.get(id)?.publishedAt).filter(Boolean).sort().at(-1);
+    const match = linkGame(text, allGames, topSurnames, newest);
     st.gameKey = match?.key;
     // partida citada que não estava entre as de destaque também vai no digest
     if (match && !games.some((g) => g.key === match.key)) games.push(match);
@@ -959,9 +984,9 @@ try {
       const essential = essentials(text);
       tried++;
       runArticles.tried++;
-      // resumo proporcional ao trecho lido: um quarto dele, entre 60 e 200 palavras (proteção de direito autoral)
-      // até 25% da matéria; nota curta (120 a 240 palavras) ganha resumo de 40 a 60 palavras
-      const target = Math.min(200, Math.max(Math.min(60, Math.round(srcWords * 0.4)), Math.round(countWords([essential]) * 0.25)));
+      // resumo proporcional ao trecho lido: um quarto dele, até 120 palavras (micro-artigo: ~40 s de
+      // leitura, sem texto gigante; também protege o direito autoral); nota curta ganha 25 a 60 palavras
+      const target = Math.min(120, Math.max(Math.min(60, Math.round(srcWords * 0.4)), Math.round(countWords([essential]) * 0.25)));
       await sleep(AI_PAUSE);
       t0 = tokensUsed;
       const draft = await ai(
@@ -1116,7 +1141,8 @@ try {
         console.log(`  texto pulado (material curto, ${thirdWords + countWords(summaries.filter(Boolean))} palavras): ${st.title}`);
         continue;
       }
-      const target = Math.min(180, Math.round((thirdWords + countWords(summaries)) * 0.6));
+      // micro-artigo: o destaque também fica em até 120 palavras
+      const target = Math.min(120, Math.round((thirdWords + countWords(summaries)) * 0.6));
       await sleep(AI_PAUSE);
       t0 = tokensUsed;
       const draft = await ai(STORY_PROMPT, `Manchete: ${st.title}\nTamanho: até ${target} palavras no "O que aconteceu".\n\nMaterial:\n${material}`, WRITE_TOKENS, 'low', WRITERS);

@@ -12,6 +12,8 @@ export type Translation = {
   category: Category; relevant: boolean;
   // checked = o resumo curto foi conferido contra o título e o trecho da fonte; só assim ele aparece
   checked?: boolean;
+  // partida de que a notícia fala (analisada pelo Stockfish do robô)
+  gameKey?: string;
 };
 // Resumo em PT de uma matéria do feed, escrito pela IA e checado frase a frase contra a fonte.
 // paragraphs vazio + failedAt = tentativa que falhou; o robô só tenta de novo depois de 24 h.

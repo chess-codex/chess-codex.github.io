@@ -22,8 +22,8 @@ const AUTO_PAUSE = 12_000;
 export default function Today() {
   const c = usePalette();
   const { refreshing, refresh, settings, setSettings, updatedAt } = useStore();
-  const games = useGames().slice(0, 12);
   const { highlights, news } = useToday();
+  const games = useGames().slice(0, 12);
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
   // largura real do carrossel: na web a coluna tem teto (760), menor que a janela

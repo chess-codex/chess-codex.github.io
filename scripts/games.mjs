@@ -365,13 +365,22 @@ const TEAM_ALIASES = {
   France: ['France', 'França'],
   Spain: ['Spain', 'Espanha'],
   Brazil: ['Brazil', 'Brasil'],
+  Hungary: ['Hungary', 'Hungria'],
+  Georgia: ['Georgia', 'Geórgia'],
+  Ukraine: ['Ukraine', 'Ucrânia'],
+  Turkiye: ['Turkiye', 'Türkiye', 'Turkey', 'Turquia'],
+  Italy: ['Italy', 'Itália'],
+  Poland: ['Poland', 'Polônia'],
+  Vietnam: ['Vietnam', 'Vietnã'],
+  Azerbaijan: ['Azerbaijan', 'Azerbaijão'],
+  Argentina: ['Argentina'],
 };
 
 /**
  * Acha a partida de que a notícia fala: os dois jogadores citados > um jogador > as duas seleções > uma seleção.
  * Entre as candidatas do mesmo nível, a mais dramática.
  */
-export function linkGame(text, games, topSurnames = []) {
+export function linkGame(text, games, topSurnames = [], when = null) {
   const has = (w) => w && w.length >= 3 && new RegExp(`(^|[^\\p{L}])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}])`, 'iu').test(text);
   const team = (t) => (t ? (TEAM_ALIASES[t] ?? [t]).some(has) : false);
   // citar um jogador só liga a partida se a notícia fala de jogo (um homenageado num prêmio, por exemplo, não)
@@ -379,6 +388,12 @@ export function linkGame(text, games, topSurnames = []) {
   // jogadores conhecidos citados na notícia (das partidas analisadas e do Top 10)
   const known = new Set([...games.flatMap((g) => [g.whiteSurname, g.blackSurname]), ...topSurnames].filter((n) => n && n.length >= 4).map((n) => n.toLowerCase()));
   const mentioned = [...known].filter(has);
+  // seleção de cada jogador, pelas partidas analisadas (vale na Olimpíada e em outros torneios por equipes)
+  const teamOf = new Map();
+  for (const g of games) {
+    if (g.whiteTeam) teamOf.set(g.whiteSurname.toLowerCase(), g.whiteTeam);
+    if (g.blackTeam) teamOf.set(g.blackSurname.toLowerCase(), g.blackTeam);
+  }
   // "9ª rodada", "rodada 9", "round 9", "R9": a partida tem que ser dessa rodada
   // várias rodadas citadas (ex.: "R9" e "Rounds 10–11") = qualquer uma delas vale
   const rounds = new Set();
@@ -387,15 +402,29 @@ export function linkGame(text, games, topSurnames = []) {
     const b = m[2] ? Number(m[2]) : a;
     for (let n = a; n <= b && n - a < 12; n++) rounds.add(n);
   }
+  // seleções citadas na notícia ("Índia vence a Inglaterra"): partida de outra seleção é outro jogo
+  const allTeams = new Set([...Object.keys(TEAM_ALIASES), ...games.flatMap((g) => [g.whiteTeam, g.blackTeam]).filter(Boolean)]);
+  const mentionedTeams = [...allTeams].filter(team);
+  // a notícia sai depois do jogo: até 2 dias (7 se cita os dois jogadores); 6 h de folga para fuso e horário
+  const published = when ? Date.parse(when) : NaN;
+  const startOf = (g) => g.startsAt ?? Date.parse(String(g.date ?? '').replace(/\./g, '-'));
+  const inTime = (g, days) => {
+    if (!Number.isFinite(published) || !Number.isFinite(startOf(g))) return true;
+    const hours = (published - startOf(g)) / 3_600_000;
+    return hours >= -6 && hours <= days * 24;
+  };
   const level = (g) => {
     if (rounds.size && !rounds.has(Number(String(g.round).match(/\d+/)?.[0]))) return 0;
     const w = g.whiteSurname.length >= 4 && has(g.whiteSurname);
     const b = g.blackSurname.length >= 4 && has(g.blackSurname);
-    if (w && b) return 4;
-    if (!aboutPlay) return 0;
-    // a notícia cita outro jogador que não está nesta partida: é outro jogo
+    if (w && b) return inTime(g, 7) ? 4 : 0;
+    if (!aboutPlay || !inTime(g, 2)) return 0;
+    if (mentionedTeams.some((t) => t !== g.whiteTeam && t !== g.blackTeam)) return 0;
+    // a notícia cita outro jogador que não está nesta partida: é outro jogo, a não ser que seja
+    // colega de seleção ("Gukesh e Praggnanandhaa lideram a Índia"): aí é o mesmo match
     const players = [g.whiteSurname.toLowerCase(), g.blackSurname.toLowerCase()];
-    if (mentioned.some((n) => !players.includes(n))) return 0;
+    const teams = [g.whiteTeam, g.blackTeam].filter(Boolean);
+    if (mentioned.some((n) => !players.includes(n) && !(teams.length && teams.includes(teamOf.get(n))))) return 0;
     if (w || b) return 3;
     const tw = team(g.whiteTeam);
     const tb = team(g.blackTeam);

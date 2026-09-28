@@ -232,6 +232,17 @@ export function ReadBadge({ words, minutes }: { words?: number; minutes?: number
   );
 }
 
+/** Selo de que a notícia traz a partida analisada pelo Stockfish (tabuleiro e lance decisivo). */
+export function GameBadge() {
+  const c = usePalette();
+  return (
+    <View style={[styles.readBadge, { backgroundColor: c.whiskySoft }]}>
+      <Ionicons name="play-circle-outline" size={10} color={c.whisky} />
+      <Text style={[styles.readBadgeTxt, { color: c.whisky }]}>Partida</Text>
+    </View>
+  );
+}
+
 // o cavalo das peças do tabuleiro (Cburnett) em whisky, com o contorno no marinho escuro
 const ART_KNIGHT = PIECES.wN.replace(/#fff/g, '#E3A04A').replace(/#000/g, '#152036');
 // casas claras de um tabuleiro 4×4, bem apagadas, como textura do fundo
@@ -395,6 +406,8 @@ type NewsView = {
   via: string;
   time?: string;
   badge?: { words?: number; minutes?: number };
+  // a notícia traz a partida analisada (tabuleiro, lance decisivo e relato)
+  game?: boolean;
   // categoria da curtida (ordena as Notícias do dia) e link que vai no compartilhamento
   category: string;
   url?: string;
@@ -428,6 +441,7 @@ export function NewsCard(props: { story: MicroArticle } | { item: FeedItem }) {
       via: viaSources(a.coverage, items),
       time: a.publishedAt || undefined,
       badge: a.body?.length ? { minutes: a.minutes } : undefined,
+      game: !!a.game,
       // mesma curtida e mesmo link da página da história: a editoria e a primeira fonte
       category: a.tag.toLowerCase(),
       url: a.coverage[0]?.url ?? a.points?.[0]?.url,
@@ -454,6 +468,7 @@ export function NewsCard(props: { story: MicroArticle } | { item: FeedItem }) {
       via: i.publisher ?? sourceById(i.source).name,
       time: i.publishedAt,
       badge: text ? { words: text.words } : undefined,
+      game: !!digest.items[i.id]?.gameKey,
       category,
       // o link original: o crédito fica com quem publicou
       url: i.url,
@@ -492,7 +507,7 @@ export function NewsCard(props: { story: MicroArticle } | { item: FeedItem }) {
           {v.via ? ` · via ${v.via}` : ''}
           {v.time ? ` · ${timeAgo(v.time)}` : ''}
         </Text>
-        {v.badge ? <ReadBadge {...v.badge} /> : null}
+        {v.game ? <GameBadge /> : v.badge ? <ReadBadge {...v.badge} /> : null}
         <CardActions
           id={id}
           info={{ category: v.category, title: v.title }}
