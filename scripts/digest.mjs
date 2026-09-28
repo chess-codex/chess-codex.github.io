@@ -19,6 +19,7 @@ import { CHECK_PROMPT, CHECK_RULES, GLOSSARY } from './prompts.mjs';
 import { copiedRun, essentials, feedOverlap, fetchArticle, fixSpelling, hasQuote, isPortuguese, parseChecks, sentences } from './articles.mjs';
 import { fetchTop } from './fide.mjs';
 import { fetchRecentGames, linkGame } from './games.mjs';
+import { channelOf, fetchYouTube } from './youtube.mjs';
 
 const OUT = new URL('../src/data/digest.json', import.meta.url);
 const PAGES = new URL('../docs/digest.json', import.meta.url);
@@ -282,8 +283,21 @@ const normCategory = (c) => {
 // 1) Feeds
 const items = [];
 const failedFeeds = new Set(); // fonte que falhou nesta execução mantém os resumos anteriores
+const YT_KEY = process.env.YOUTUBE_API_KEY;
+let ytSkipped = 0;
 for (const src of SOURCES) {
   try {
+    // canais do YouTube: o RSS saiu do ar; vão pela API oficial, e sem chave ficam de fora
+    if (channelOf(src.feed)) {
+      if (!YT_KEY) {
+        ytSkipped++;
+        continue;
+      }
+      const got = await fetchYouTube(src, YT_KEY);
+      if (!got.length) throw new Error('canal sem vídeos');
+      items.push(...got);
+      continue;
+    }
     // servidor travado não segura o robô inteiro
     const res = await fetch(src.feed, { headers: { 'User-Agent': 'Mozilla/5.0 ChessCodexNews/0.1' }, signal: AbortSignal.timeout(30000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -297,6 +311,7 @@ for (const src of SOURCES) {
     console.warn(`${src.id}: falhou (${errText(e)})`);
   }
 }
+if (ytSkipped) console.log(`YouTube: ${ytSkipped} canais de fora (defina YOUTUBE_API_KEY; o RSS do YouTube saiu do ar)`);
 const seen = new Set();
 const fresh = items
   .filter((i) => (seen.has(i.url) ? false : (seen.add(i.url), true)))
@@ -921,7 +936,8 @@ try {
     try {
       const text = await fetchArticle(it.url);
       if (!text) {
-        // pode ser bloqueio passageiro: tenta de novo na próxima execução
+        // assinatura (El País) ou bloqueio: nova tentativa só depois de RETRY_FAILED, não a cada execução
+        remember(it);
         console.log(`  resumo pulado (página sem texto): ${label}`);
         continue;
       }

@@ -177,7 +177,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
     const sources = settings.region ? [...SOURCES, localSource(settings.region)] : SOURCES;
-    const results = await Promise.allSettled(sources.map((s) => fetchSource(s)));
+    // canais do YouTube só pelo robô (API com chave): o RSS de canal do YouTube saiu do ar
+    const results = await Promise.allSettled(sources.filter((s) => !s.feed.includes('youtube.com/feeds')).map((s) => fetchSource(s)));
     const fresh: FeedItem[] = [];
     const failed: SourceId[] = [];
     results.forEach((r, idx) => (r.status === 'fulfilled' ? fresh.push(...r.value) : failed.push(sources[idx].id)));

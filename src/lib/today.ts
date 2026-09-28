@@ -24,6 +24,8 @@ const HOUR = 3_600_000;
 // bônus pequenos, medidos em horas de frescor: sobem a notícia sem enterrar a que acabou de sair
 const FOLLOW_BONUS = 6 * HOUR;
 const LIKE_BONUS = 3 * HOUR; // por curtida na mesma categoria, contando até 2
+// notícia com texto completo nosso sobe na frente das que só têm o resumo curto: a gazeta abre com leitura
+const TEXT_BONUS = 48 * HOUR;
 
 // o Google Notícias põe o veículo no fim do título ("... – International Chess Federation")
 const originalTitle = (i: FeedItem) => (i.source.startsWith('gnews') ? i.title.replace(/\s[-–—]\s[^-–—]+$/, '') : i.title);
@@ -107,7 +109,8 @@ export function useToday() {
         const pt = digest.items[i.id]?.title ?? i.title;
         const follow = mentions(`${i.title} ${i.excerpt} ${pt}`, tracked).length > 0;
         const cat = Math.min(2, likes.get(categoryOf(digest, i)) ?? 0);
-        const score = (Date.parse(i.publishedAt) || 0) + (follow ? FOLLOW_BONUS : 0) + cat * LIKE_BONUS;
+        const full = !!digest.articles?.[i.id]?.paragraphs?.some((p) => p.trim());
+        const score = (Date.parse(i.publishedAt) || 0) + (follow ? FOLLOW_BONUS : 0) + cat * LIKE_BONUS + (full ? TEXT_BONUS : 0);
         return { i, pt, score };
       })
       // palavra silenciada vale também para a manchete traduzida
