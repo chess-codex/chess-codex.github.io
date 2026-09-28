@@ -6,6 +6,9 @@ export type SourceId =
   | 'gnews-br' | 'gnews-players' | 'gnews-science'
   | 'gnews-local'
   | 'yt-gotham' | 'yt-hikaru' | 'yt-agadmator' | 'yt-chesscom' | 'yt-stlouis'
+  | 'yt-supi' | 'yt-raffael' | 'yt-krikor' | 'yt-xadrezbrasil' | 'yt-leitao' | 'yt-evandro'
+  | 'yt-cbx' | 'yt-chesscompt' | 'yt-alboredo' | 'yt-xadreztotal'
+  | 'fbx-ba' | 'fexeg' | 'fbx-df' | 'lbx' | 'blogesporte' | 'pbesportes' | 'xadrez-pelotas' | 'xadrez-pirai'
   | 'bsky-chesscompt' | 'bsky-leontxo' | 'bsky-chess24' | 'bsky-europeechecs'
   | 'bsky-lichess' | 'masto-olympus';
 
@@ -67,10 +70,30 @@ export const SOURCES: Source[] = [
   { id: 'yt-agadmator', name: 'agadmator', short: 'agadmator', feed: yt('UCL5YbN5WLFD8dLIegT5QAbA'), color: '#FF3B30', kind: 'video', lang: 'en' },
   { id: 'yt-chesscom', name: 'Chess.com (YouTube)', short: 'Chess.com TV', feed: yt('UC5kS0l76kC0xOzMPtOmSFGw'), color: '#FF3B30', kind: 'video', lang: 'en' },
   { id: 'yt-stlouis', name: 'Saint Louis Chess Club', short: 'Saint Louis', feed: yt('UCM-ONC2bCHytG2mYtKDmIeA'), color: '#FF3B30', kind: 'video', lang: 'en' },
+  // canais brasileiros (IDs conferidos na página de cada canal em 28/09/2026)
+  { id: 'yt-supi', name: 'GM Luis Paulo Supi', short: 'Supi', feed: yt('UCpiJhNVDJoKDhShQeC7tN4A'), color: '#FF3B30', kind: 'video', lang: 'pt' },
+  { id: 'yt-raffael', name: 'Raffael Chess', short: 'Raffael Chess', feed: yt('UCSAo4zvM1oAJ_i4C6q6ejBA'), color: '#FF3B30', kind: 'video', lang: 'pt' },
+  { id: 'yt-krikor', name: 'GM Krikor', short: 'Krikor', feed: yt('UCwWm-fABiYbcL7ro8qONd6Q'), color: '#FF3B30', kind: 'video', lang: 'pt' },
+  { id: 'yt-xadrezbrasil', name: 'Xadrez Brasil', short: 'Xadrez Brasil', feed: yt('UC5K-TQsItHnNLjqYf8A3CTw'), color: '#FF3B30', kind: 'video', lang: 'pt' },
+  { id: 'yt-leitao', name: 'GM Rafael Leitão', short: 'Rafael Leitão', feed: yt('UCistQmaDouEpKROBZBkQQ9A'), color: '#FF3B30', kind: 'video', lang: 'pt' },
+  { id: 'yt-evandro', name: 'GM Evandro Barbosa', short: 'Evandro Barbosa', feed: yt('UCUccuEMBFvbl01u_h8jitVg'), color: '#FF3B30', kind: 'video', lang: 'pt' },
+  { id: 'yt-cbx', name: 'CBX News', short: 'CBX', feed: yt('UC9rgc6_2iqy9EyH0nLAqDMA'), color: '#FF3B30', kind: 'video', lang: 'pt' },
+  { id: 'yt-chesscompt', name: 'Chess.com Português (YouTube)', short: 'Chess.com PT TV', feed: yt('UCF4rlw_pDM5AUxwXzseP2vQ'), color: '#FF3B30', kind: 'video', lang: 'pt' },
+  { id: 'yt-alboredo', name: 'MF Julia Alboredo', short: 'Julia Alboredo', feed: yt('UCvJstUz_kPRKZwug_SZzQ3A'), color: '#FF3B30', kind: 'video', lang: 'pt' },
+  { id: 'yt-xadreztotal', name: 'Xadrez Total', short: 'Xadrez Total', feed: yt('UCl0pW-vG9r8AT8N2bJdMu8Q'), color: '#FF3B30', kind: 'video', lang: 'pt' },
 
   { id: 'lichess-community', name: 'Blogs do Lichess', short: 'Comunidade', feed: 'https://lichess.org/blog/community.atom', color: '#E3A04A', kind: 'comunidade', lang: 'en' },
   // o Blogger aceita max-results: sem ele, o feed passa de 500 KB
   { id: 'xadrezdiario', name: 'Xadrez Diário', short: 'Xadrez Diário', feed: 'https://www.xadrezdiario.com/feeds/posts/default?alt=rss&max-results=10', color: '#FB923C', kind: 'comunidade', lang: 'pt' },
+  // Brasil: liga, federações, imprensa regional e blogs (feeds testados em 28/09/2026), no Radar
+  { id: 'lbx', name: 'Liga Brasileira de Xadrez', short: 'LBX', feed: 'https://lbx.org.br/feed/', color: '#22C55E', kind: 'comunidade', lang: 'pt' },
+  { id: 'fbx-ba', name: 'Federação Bahiana de Xadrez', short: 'FBX Bahia', feed: 'https://fbxbahia.org/feed/', color: '#FBBF24', kind: 'comunidade', lang: 'pt' },
+  { id: 'fexeg', name: 'Federação de Xadrez de Goiás', short: 'FEXEG', feed: 'https://fexeg.com/feed/', color: '#34D399', kind: 'comunidade', lang: 'pt' },
+  { id: 'fbx-df', name: 'Federação Brasiliense de Xadrez', short: 'FBX DF', feed: 'https://fbx.org.br/feed/', color: '#60A5FA', kind: 'comunidade', lang: 'pt' },
+  { id: 'blogesporte', name: 'Blog Esporte · Xadrez', short: 'Blog Esporte', feed: 'https://blogesporte.com.br/category/xadrez/feed/', color: '#F97316', kind: 'comunidade', lang: 'pt' },
+  { id: 'pbesportes', name: 'PB Esportes · Xadrez', short: 'PB Esportes', feed: 'https://pbesportes.net/category/xadrez/feed/', color: '#A78BFA', kind: 'comunidade', lang: 'pt' },
+  { id: 'xadrez-pelotas', name: 'Xadrez em Pelotas', short: 'Xadrez Pelotas', feed: 'https://xadrezempelotas.blogspot.com/feeds/posts/default?alt=rss&max-results=10', color: '#F472B6', kind: 'comunidade', lang: 'pt' },
+  { id: 'xadrez-pirai', name: 'Xadrez Piraí', short: 'Xadrez Piraí', feed: 'https://xadrezpirai.blogspot.com/feeds/posts/default?alt=rss&max-results=10', color: '#2DD4BF', kind: 'comunidade', lang: 'pt' },
   { id: 'latitudsur', name: 'Ajedrez Latitud Sur', short: 'Latitud Sur', feed: 'https://ajedrezlatitudsur.wordpress.com/feed/', color: '#A3E635', kind: 'comunidade', lang: 'es' },
 
   // Redes: X e Instagram não têm leitura pública sem conta e sem plano pago; Bluesky e Mastodon têm.

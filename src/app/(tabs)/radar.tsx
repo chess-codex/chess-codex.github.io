@@ -13,10 +13,11 @@ import { useToday } from '@/lib/today';
 
 // Radar = tudo sobre xadrez fora das redações: vida dos jogadores, ciência, cultura,
 // vídeos, redes sociais, polêmicas e o que a comunidade está discutindo.
-type Filter = 'tudo' | 'top10' | 'regiao' | 'jogadores' | 'ciencia' | 'video' | 'redes' | 'comunidade' | 'polemica';
+type Filter = 'tudo' | 'brasil' | 'top10' | 'regiao' | 'jogadores' | 'ciencia' | 'video' | 'redes' | 'comunidade' | 'polemica';
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'tudo', label: 'Tudo' },
+  { id: 'brasil', label: 'Brasil' },
   { id: 'top10', label: 'Top 10 FIDE' },
   { id: 'video', label: 'Vídeos' },
   { id: 'redes', label: 'Redes' },
@@ -61,6 +62,8 @@ export default function Radar() {
       if (tr && !tr.relevant) return false;
       if (inToday(i)) return false;
       // Top 10 FIDE: tudo que cita alguém do top 10, de qualquer fonte (inclusive redações)
+      // Brasil: tudo o que vem de fonte em português, redações brasileiras incluídas
+      if (filter === 'brasil') return sourceById(i.source).lang === 'pt' && i.source !== 'gnews-local';
       if (filter === 'top10') return mentions(`${i.title} ${i.excerpt} ${tr?.title ?? ''}`, top10).length > 0;
       if (kind === 'jornal') return false;
       if (filter === 'regiao') return i.source === 'gnews-local';

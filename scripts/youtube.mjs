@@ -9,7 +9,8 @@ const API = 'https://www.googleapis.com/youtube/v3/playlistItems';
 export const channelOf = (feed) => feed.match(/channel_id=(UC[\w-]{22})/)?.[1] ?? null;
 
 /** Últimos vídeos do canal no formato FeedItem do app. */
-export async function fetchYouTube(src, key, max = 8) {
+// 15: com os Shorts filtrados, sobram os vídeos longos mais recentes
+export async function fetchYouTube(src, key, max = 15) {
   const channel = channelOf(src.feed);
   if (!channel) throw new Error('canal sem channel_id');
   // a playlist de envios do canal é o mesmo id com UU no lugar de UC
@@ -21,6 +22,8 @@ export async function fetchYouTube(src, key, max = 8) {
   return (data.items ?? [])
     .map((v) => v.snippet)
     .filter((s) => s?.resourceId?.videoId && s.title && s.title !== 'Private video' && s.title !== 'Deleted video')
+    // Shorts (título com #shorts ou cheio de hashtags) ficam de fora: o Radar fica com os vídeos de verdade
+    .filter((s) => !/#shorts/i.test(s.title) && (s.title.match(/#\w/g) ?? []).length < 2)
     .map((s) => ({
       id: `${src.id}-${s.resourceId.videoId}`,
       source: src.id,
