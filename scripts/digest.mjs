@@ -33,7 +33,15 @@ const MAX_TRANSLATE = 60;
 const HAS_NVIDIA = !!process.env.NVIDIA_API_KEY;
 const MAX_ARTICLES = HAS_NVIDIA ? 25 : 8;
 const ARTICLE_MAX_AGE = 3 * 24 * 3600 * 1000; // matéria mais velha só ganha resumo se estiver numa história
-const AI_PAUSE = 20000; // pausa antes de cada chamada de texto próprio (8 mil tokens por minuto)
+// pausa antes de cada chamada de texto próprio: o Groq grátis aceita 8 mil tokens por minuto;
+// a NVIDIA aceita 40 pedidos por minuto, então basta um respiro (429 continua esperando o retry-after)
+const AI_PAUSE = HAS_NVIDIA ? 1500 : 20000;
+// resposta que não chega em 90 s não chega mais: desiste e segue (antes, uma travada segurava a rodada)
+const AI_TIMEOUT = 90_000;
+// relógio da rodada: o texto próprio para aos 12 min e o resto fica para a próxima, para o site
+// (partidas, manchetes, capa) nunca esperar a redação
+const T0 = Date.now();
+const TEXT_MINUTES = 12;
 // Tokens do texto próprio (conferência dos resumos curtos, 7a e 7b), contados pelo usage real de
 // cada resposta, por execução e por dia (UTC). A cota do gpt-oss-120b é de ~200 mil por dia e o robô
 // roda 8 vezes por dia, fora as execuções de push. Tradução e agrupamento vão para o 20b (cota
@@ -145,6 +153,7 @@ async function callProvider(p, system, user, maxTokens, effort) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const res = await fetch(p.url, {
       method: 'POST',
+      signal: AbortSignal.timeout(AI_TIMEOUT),
       headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: p.model,
@@ -470,7 +479,7 @@ async function verifyChunk(chunk) {
     console.log('  lote de checagem falhou, conferindo uma por uma');
     const all = [];
     for (let n = 0; n < chunk.length; n++) {
-      await sleep(10000);
+      await sleep(AI_PAUSE);
       try {
         const [ck] = await verifyChunk([chunk[n]]);
         if (ck) all.push({ ...ck, i: n });
@@ -529,7 +538,7 @@ function acceptDraft(c, ck) {
 
 for (let k = 0; k < drafts.length; k += 3) {
   const chunk = drafts.slice(k, k + 3);
-  await sleep(20000);
+  await sleep(AI_PAUSE);
   let checks = [];
   try {
     checks = await verifyChunk(chunk);
@@ -704,7 +713,8 @@ let aiFailures = 0; // duas falhas seguidas = IA fora do ar ou cota do dia no fi
 const stopLogged = new Set();
 const textStop = (need = 0) => {
   let why = '';
-  if (!strongLeft()) why = 'IA forte sem cota do dia';
+  if (Date.now() - T0 > TEXT_MINUTES * 60_000) why = `tempo da rodada (${TEXT_MINUTES} min)`;
+  else if (!strongLeft()) why = 'IA forte sem cota do dia';
   else if (aiFailures >= 2) why = 'IA forte fora do ar (duas falhas seguidas)';
   else if (textSpent() + need > runBudget) why = 'orçamento';
   if (why && !stopLogged.has(why)) {

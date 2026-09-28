@@ -42,8 +42,11 @@ jobs:
             && node -e "JSON.parse(require('fs').readFileSync('/tmp/prev-arquivo.json', 'utf8'))" \
             && mv /tmp/prev-arquivo.json src/data/arquivo.json || true
       # sem chave ou com a IA fora do ar, o site sai mesmo assim com o último digest
+      # teto de segurança: o robô já se limita a ~12 min de texto; se algo travar, aos 20 min o site
+      # sai com o que ele já gravou (checkpoints) ou com o digest anterior
       - run: node scripts/digest.mjs
         continue-on-error: true
+        timeout-minutes: 20
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
