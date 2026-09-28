@@ -29,7 +29,9 @@ const ITEM_EXCERPT = 300;
 // com redações e imprensa primeiro e, dentro delas, os mais novos.
 const MAX_TRANSLATE = 60;
 // matérias resumidas por execução (tentativas, não sucessos); o orçamento costuma parar antes
-const MAX_ARTICLES = 8;
+// Com a chave da NVIDIA (GLM 5.3, cota própria) o texto próprio deixa de depender só da cota do Groq
+const HAS_NVIDIA = !!process.env.NVIDIA_API_KEY;
+const MAX_ARTICLES = HAS_NVIDIA ? 25 : 8;
 const ARTICLE_MAX_AGE = 3 * 24 * 3600 * 1000; // matéria mais velha só ganha resumo se estiver numa história
 const AI_PAUSE = 20000; // pausa antes de cada chamada de texto próprio (8 mil tokens por minuto)
 // Tokens do texto próprio (conferência dos resumos curtos, 7a e 7b), contados pelo usage real de
@@ -37,8 +39,8 @@ const AI_PAUSE = 20000; // pausa antes de cada chamada de texto próprio (8 mil 
 // roda 8 vezes por dia, fora as execuções de push. Tradução e agrupamento vão para o 20b (cota
 // separada); a conferência das manchetes continua no 120b (~6 a 8 mil por execução), por fora deste
 // orçamento. Por isso o texto também para antes de o 120b encostar no teto do dia (STRONG_DAY).
-const TEXT_BUDGET = 35000;
-const DAILY_TEXT_BUDGET = 160000;
+const TEXT_BUDGET = HAS_NVIDIA ? 140000 : 35000;
+const DAILY_TEXT_BUDGET = HAS_NVIDIA ? 900000 : 160000;
 const STRONG_DAY = 190000; // teto do 120b no dia somando tudo (manchetes, texto e tradução de reserva)
 const HEADLINE_RESERVE = 8000; // conferência das manchetes de cada execução que ainda falta no dia
 // parte do que ainda cabe no dia (texto e 120b) guardada para cada execução que ainda falta: sem isso,
@@ -75,11 +77,12 @@ const LIGHT_MAIN = 'groq/gpt-oss-20b';
 // limite ou cair, a próxima da lista assume. Os limites da Groq são por modelo.
 const PROVIDERS = [
   process.env.GROQ_API_KEY && { name: STRONG_MAIN, url: 'https://api.groq.com/openai/v1/chat/completions', key: process.env.GROQ_API_KEY, model: 'openai/gpt-oss-120b' },
-  process.env.NVIDIA_API_KEY && { name: 'nvidia', url: 'https://integrate.api.nvidia.com/v1/chat/completions', key: process.env.NVIDIA_API_KEY, model: process.env.NVIDIA_MODEL ?? 'openai/gpt-oss-120b' },
+  process.env.NVIDIA_API_KEY && { name: 'nvidia', url: 'https://integrate.api.nvidia.com/v1/chat/completions', key: process.env.NVIDIA_API_KEY, model: process.env.NVIDIA_MODEL ?? 'z-ai/glm-5.3' }, // o gpt-oss-120b saiu da NVIDIA em 03/09/2026
   process.env.GROQ_API_KEY && { name: LIGHT_MAIN, url: 'https://api.groq.com/openai/v1/chat/completions', key: process.env.GROQ_API_KEY, model: 'openai/gpt-oss-20b' },
 ].filter(Boolean);
 // Conferência das manchetes e escrita e checagem de texto próprio só com IA forte: sem texto é melhor que texto fraco
-const STRONG = [STRONG_MAIN, 'nvidia'];
+// com a NVIDIA, ela escreve e confere primeiro e o 120b do Groq fica de reserva
+const STRONG = HAS_NVIDIA ? ['nvidia', STRONG_MAIN] : [STRONG_MAIN, 'nvidia'];
 // Tradução, classificação e agrupamento: o 20b primeiro, para a cota do 120b ficar com o texto próprio.
 // O 120b é o último recurso; o que ele gastar aqui sai do orçamento do texto (STRONG_DAY)
 const LIGHT = [LIGHT_MAIN, 'nvidia', STRONG_MAIN];
@@ -667,7 +670,8 @@ const clock = new Date();
 const runsAfter = Math.max(0, Math.floor((24 - clock.getUTCHours() - clock.getUTCMinutes() / 60) / 3)); // o robô roda a cada 3 h
 const dailyLeft = Math.max(0, DAILY_TEXT_BUDGET - dayText);
 const strongDay = modelsNow()[STRONG_MAIN] ?? 0;
-const dayRoom = Math.max(0, Math.min(dailyLeft, STRONG_DAY - strongDay - runsAfter * HEADLINE_RESERVE));
+// com a NVIDIA na frente, o teto do 120b não limita o texto (ele só entra se a NVIDIA falhar)
+const dayRoom = HAS_NVIDIA ? dailyLeft : Math.max(0, Math.min(dailyLeft, STRONG_DAY - strongDay - runsAfter * HEADLINE_RESERVE));
 const runBudget = Math.round(Math.min(TEXT_BUDGET, Math.max(dayRoom - runsAfter * RUN_FLOOR, dayRoom / (runsAfter + 1))));
 console.log(`orçamento de texto: ${runBudget} tokens nesta execução (hoje: ${dayText} de ${DAILY_TEXT_BUDGET} no texto, ${strongDay} de ${STRONG_DAY} no 120b; faltam ${runsAfter} execuções no dia)`);
 let aiFailures = 0; // duas falhas seguidas = IA fora do ar ou cota do dia no fim: para de tentar

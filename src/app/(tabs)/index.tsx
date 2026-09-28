@@ -84,7 +84,9 @@ export default function Today() {
       // só o que o robô já traduziu e achou relevante: é o que tem título e texto nossos.
       // Redação vista pelo Google Notícias fica de fora: o feed direto dela já traz a matéria
       if (kind === 'geral' && fromJornal(i.publisher)) return false;
-      return (kind === 'jornal' || kind === 'geral') && !!tr && tr.relevant !== false && !inStory(i);
+      // a gazeta só publica notícia com texto nosso: sem resumo em PT, ela fica só no Radar
+      const hasText = !!digest.articles?.[i.id]?.paragraphs?.length || !!tr?.summary?.trim();
+      return (kind === 'jornal' || kind === 'geral') && !!tr && tr.relevant !== false && hasText && !inStory(i);
     },
     [digest, inStory],
   );
