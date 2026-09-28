@@ -81,7 +81,7 @@ const POINTS_TOKENS = 2500; // lote de 10 resumos curtos com raciocínio 'medium
 // "literal" só vale em frase longa: a tradução quase palavra por palavra de uma frase de 20+
 // palavras da fonte tem, em português, 15 palavras ou mais
 const LITERAL_MIN_WORDS = 15;
-const RETRY_FAILED = 24 * 3600 * 1000; // matéria descartada só é tentada de novo depois de 24 h
+const RETRY_FAILED = 8 * 3600 * 1000; // matéria descartada é tentada de novo depois de 8 h
 
 const STRONG_MAIN = 'groq/gpt-oss-120b';
 // o que o revisor da NVIDIA (NVIDIA_CHECK_MODEL, ver bench-checker.mjs) aceita: effort = raciocínio fixo
@@ -102,6 +102,10 @@ const PROVIDERS = [
 // Conferência das manchetes e escrita e checagem de texto próprio só com IA forte: sem texto é melhor que texto fraco
 // com a NVIDIA, ela escreve e confere primeiro e o 120b do Groq fica de reserva
 const STRONG = HAS_NVIDIA ? ['nvidia', STRONG_MAIN] : [STRONG_MAIN, 'nvidia'];
+// Quem escreve o texto próprio: o 120b do Groq responde em segundos; o GLM grátis da NVIDIA chegou a
+// passar de 90 s por resposta e só dava 1 a 3 matérias por execução. O GLM fica com a conferência
+// (checkOrder tira quem escreveu) e escreve só se o 120b cair ou acabar a cota
+const WRITERS = [STRONG_MAIN, 'nvidia'];
 // Tradução, classificação e agrupamento: o 20b primeiro, para a cota do 120b ficar com o texto próprio.
 // O 120b é o último recurso; o que ele gastar aqui sai do orçamento do texto (STRONG_DAY)
 const LIGHT = [LIGHT_MAIN, 'nvidia', STRONG_MAIN];
@@ -943,7 +947,7 @@ try {
         `Fonte: ${sourceName(it)}\nTítulo: ${it.title}\nTamanho: até ${target} palavras.\n\nTexto original (começo da matéria):\n${essential}`,
         WRITE_TOKENS,
         'low',
-        STRONG,
+        WRITERS,
       );
       aiFailures = 0;
       const writer = lastProvider;
@@ -1087,7 +1091,7 @@ try {
       const target = Math.min(180, Math.round((thirdWords + countWords(summaries)) * 0.6));
       await sleep(AI_PAUSE);
       t0 = tokensUsed;
-      const draft = await ai(STORY_PROMPT, `Manchete: ${st.title}\nTamanho: até ${target} palavras no "O que aconteceu".\n\nMaterial:\n${material}`, WRITE_TOKENS, 'low', STRONG);
+      const draft = await ai(STORY_PROMPT, `Manchete: ${st.title}\nTamanho: até ${target} palavras no "O que aconteceu".\n\nMaterial:\n${material}`, WRITE_TOKENS, 'low', WRITERS);
       aiFailures = 0;
       const writer = lastProvider;
       const drafted = trimToWords(cleanList(draft?.body, 3), Math.round(target * 1.2));

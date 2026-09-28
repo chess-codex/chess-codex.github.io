@@ -75,6 +75,11 @@ export default function Story() {
   const sources = [...fromPoints, ...fromCoverage];
   const names = [...new Set(sources.map((e) => e.publisher ?? sourceById(e.source).name))];
   const listOpen = hidden || open;
+  // Sem o texto corrido do robô, o "O que aconteceu" sai dos resumos curtos em PT de cada fonte
+  // (já prontos no digest), com o nome de quem publicou: a página nunca fica só com links
+  const recap = a.body?.length
+    ? []
+    : [...new Map((a.points ?? []).filter((p) => p.text?.trim() && p.text !== a.dek).map((p) => [p.text, p])).values()].slice(0, 4);
 
   // manchete segura do robô; igual à original ou ainda contando o resultado, vira aviso
   const safeTitle = a.spoiler ? safeOrNull(a.safeTitle, a.title) : null;
@@ -151,6 +156,16 @@ export default function Story() {
                   <Text key={i} style={[styles.bodyTxt, { color: c.ink, fontSize: 17 * s, lineHeight: 26 * s }]}>{p}</Text>
                 ))}
               </View>
+            ) : recap.length ? (
+              <View style={{ gap: 12 }}>
+                <Text style={[styles.blockLabel, { color: c.muted }]}>O QUE ACONTECEU</Text>
+                {recap.map((p) => (
+                  <Text key={p.url} style={[styles.bodyTxt, { color: c.ink, fontSize: 17 * s, lineHeight: 26 * s }]}>
+                    <Text style={{ fontFamily: font.semibold }}>{p.publisher ?? sourceById(p.source).name}: </Text>
+                    {p.text}
+                  </Text>
+                ))}
+              </View>
             ) : a.bullets?.length ? (
               <View style={[styles.block, { backgroundColor: c.surface, borderColor: c.hairline }]}>
                 <Text style={[styles.blockLabel, { color: c.muted }]}>O QUE ACONTECEU</Text>
@@ -185,6 +200,10 @@ export default function Story() {
             {a.body?.length ? (
               <Text style={[styles.note, { color: c.muted, borderTopColor: c.hairline }]}>
                 Resumo automático do Chess Codex, conferido frase a frase com {joinNames(names)}. Em caso de dúvida, vale o original.
+              </Text>
+            ) : recap.length ? (
+              <Text style={[styles.note, { color: c.muted, borderTopColor: c.hairline }]}>
+                Resumos automáticos do Chess Codex a partir de cada fonte. As matérias completas estão nos links abaixo.
               </Text>
             ) : null}
           </>
