@@ -9,6 +9,7 @@ import { createEngine } from './engine.mjs';
 
 const UA = { 'User-Agent': 'Mozilla/5.0 ChessCodexNews/0.1' };
 const HOURS = 72; // partidas das últimas 72h servem para ligar às notícias
+const MIN_FEATURED = 8; // abaixo disso a seção completa com partidas dos últimos 3 dias
 const FEATURED_HOURS = 36; // "Partidas do dia" mostra só as últimas 36h
 const MATE = 20;
 
@@ -306,6 +307,8 @@ export async function fetchRecentGames({ topSurnames = [], limit = 16 } = {}) {
     }
   }
   for (const g of unique) if (picked.length < limit && !picked.includes(g) && g.startsAt >= recentCut) picked.push(g);
+  // dia sem torneio grande: completa com as melhores dos últimos 3 dias (já analisadas pelo Stockfish)
+  for (const g of unique) if (picked.length < MIN_FEATURED && !picked.includes(g)) picked.push(g);
   picked.sort((a, b) => gameScore(b, topSurnames) - gameScore(a, topSurnames));
   console.log(`partidas: ${rounds.length} rodadas, ${games.length} jogos analisados, ${Math.min(limit, picked.length)} escolhidos`);
   return { featured: picked.slice(0, limit), all: unique };

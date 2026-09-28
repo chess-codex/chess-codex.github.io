@@ -283,6 +283,7 @@ function Thumb({ uri, size, label, color, blur, recyclingKey }: { uri?: string; 
       source={uri}
       style={{ width: size, height: size, borderRadius: 12, backgroundColor: c.surfaceAlt }}
       contentFit="cover"
+      contentPosition="top" // fotos de xadrez têm rostos no alto: se cortar, corta embaixo
       transition={200}
       recyclingKey={recyclingKey}
       blurRadius={blur ? SPOILER_BLUR : 0}
@@ -530,6 +531,7 @@ export function MicroCard({ a, hero }: { a: MicroArticle; hero?: boolean }) {
           source={a.image}
           style={[hero ? styles.heroImg : styles.cardImg, { backgroundColor: c.surfaceAlt }]}
           contentFit="cover"
+          contentPosition="top" // fotos de xadrez têm rostos no alto: se cortar, corta embaixo
           transition={250}
           recyclingKey={a.id}
           blurRadius={hidden ? SPOILER_BLUR : 0}
@@ -635,7 +637,8 @@ const styles = StyleSheet.create({
   newsFootTxt: { flex: 1, fontFamily: font.regular, fontSize: 12 },
   newsBrand: { fontFamily: font.semibold },
   hero: { marginHorizontal: 16, borderRadius: radius.xl, padding: 20, paddingTop: 0, gap: 10, overflow: 'hidden' },
-  heroImg: { height: 190, marginHorizontal: -20, marginBottom: 6 },
+  // 16:9 é o formato das fotos de notícia: quase não corta
+  heroImg: { aspectRatio: 16 / 9, marginHorizontal: -20, marginBottom: 6 },
   cardImg: { height: 118, marginHorizontal: -16, marginTop: -16, marginBottom: 4 },
   card: { width: 250, borderRadius: radius.lg, padding: 16, gap: 8, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },

@@ -110,7 +110,7 @@ export default function Read() {
 
         {item.image ? (
           // a foto também pode contar o resultado: desfocada até revelar
-          <Image source={item.image} style={[styles.cover, { backgroundColor: c.surfaceAlt }]} contentFit="cover" transition={250} blurRadius={hidden ? SPOILER_BLUR : 0} />
+          <Image source={item.image} style={[styles.cover, { backgroundColor: c.surfaceAlt }]} contentFit="cover" contentPosition="top" transition={250} blurRadius={hidden ? SPOILER_BLUR : 0} />
         ) : null}
 
         {hidden ? (
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: font.black, letterSpacing: -0.6 },
   veil: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, alignSelf: 'flex-start' },
   veilTxt: { fontFamily: font.medium, fontSize: 13.5, flexShrink: 1 },
-  cover: { height: 210, borderRadius: radius.lg, marginHorizontal: -4 },
+  cover: { aspectRatio: 16 / 9, borderRadius: radius.lg, marginHorizontal: -4 },
   para: { fontFamily: font.regular },
   note: { fontFamily: font.regular, fontSize: 12, lineHeight: 17, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
   revealAll: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },

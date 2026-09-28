@@ -41,6 +41,10 @@ export const GameCard = memo(function GameCard({ game }: { game: Game }) {
         <Text style={[styles.meta, { color: c.muted }]} numberOfLines={1}>
           {hideResult ? game.round : `${resultLabel(game)} · ${game.round}`}
         </Text>
+        {/* torneio embaixo da rodada, sem o parêntese de cidade/ano para caber no cartão */}
+        <Text style={[styles.event, { color: c.muted }]} numberOfLines={2}>
+          {game.event.replace(/\s*\([^)]*\)/, '')}
+        </Text>
         <Text style={[styles.key, { color: c.inkSoft }]} numberOfLines={2}>
           {hideResult ? 'Toque para ver a posição decisiva' : `${moveLabel(game, game.keyPly)}: ${fmtEval(game.keyBefore)} → ${fmtEval(game.keyAfter)}`}
         </Text>
@@ -57,5 +61,6 @@ const styles = StyleSheet.create({
   badgeTxt: { fontFamily: font.bold, fontSize: 11 },
   players: { fontFamily: font.bold, fontSize: 14.5 },
   meta: { fontFamily: font.medium, fontSize: 12, marginTop: 2 },
+  event: { fontFamily: font.regular, fontSize: 11.5, lineHeight: 15 },
   key: { fontFamily: font.regular, fontSize: 12.5, lineHeight: 17 },
 });

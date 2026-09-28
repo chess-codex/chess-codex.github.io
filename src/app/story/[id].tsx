@@ -111,7 +111,7 @@ export default function Story() {
         {a.image ? (
           <View style={{ gap: 6 }}>
             {/* a foto também pode contar o resultado: desfocada até revelar */}
-            <Image source={a.image} style={[styles.cover, { backgroundColor: c.surfaceAlt }]} contentFit="cover" transition={250} blurRadius={hidden ? SPOILER_BLUR : 0} />
+            <Image source={a.image} style={[styles.cover, { backgroundColor: c.surfaceAlt }]} contentFit="cover" contentPosition="top" transition={250} blurRadius={hidden ? SPOILER_BLUR : 0} />
             {photoBy ? <Text style={[styles.photoBy, { color: c.muted }]}>Foto: {photoBy}</Text> : null}
           </View>
         ) : null}
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   barBtn: { flexDirection: 'row', alignItems: 'center' },
   barTxt: { fontFamily: font.medium, fontSize: 16 },
   barRight: { flexDirection: 'row', alignItems: 'center', gap: 20, paddingRight: 6 },
-  cover: { height: 210, borderRadius: radius.lg, marginHorizontal: -4 },
+  cover: { aspectRatio: 16 / 9, borderRadius: radius.lg, marginHorizontal: -4 },
   photoBy: { fontFamily: font.regular, fontSize: 11.5, textAlign: 'right' },
   kicker: { fontFamily: font.bold, fontSize: 12, letterSpacing: 1.1 },
   title: { fontFamily: font.black, letterSpacing: -0.8 },
