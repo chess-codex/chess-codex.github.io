@@ -349,6 +349,36 @@ export function isPortuguese(text) {
   return true;
 }
 
+// Grafia em português de países, cidades e termos que a IA às vezes deixa no original.
+// Troca fixa, sem IA: não muda fato nenhum, só a forma de escrever.
+const SPELLING = [
+  [/\bUzbekist(?:an|ão)\b/g, 'Uzbequistão'],
+  [/\bKazakhst(?:an|ão)\b/g, 'Cazaquistão'],
+  [/\bSamarkand\b|\bSamarcand\b(?!a)/g, 'Samarcanda'],
+  [/\bArmenia\b/g, 'Armênia'],
+  [/\bGermany\b/g, 'Alemanha'],
+  [/\bNetherlands\b/g, 'Holanda'],
+  [/\bUkraine\b/g, 'Ucrânia'],
+  [/\bHungary\b/g, 'Hungria'],
+  [/\bPoland\b/g, 'Polônia'],
+  [/\bGeorgia\b/g, 'Geórgia'],
+  [/\bVietnam\b/g, 'Vietnã'],
+  [/\bMongolia\b/g, 'Mongólia'],
+  [/\bIndia\b/g, 'Índia'],
+  [/\bEngland\b/g, 'Inglaterra'],
+  [/\bSpain\b/g, 'Espanha'],
+  [/\bFrance\b/g, 'França'],
+  [/\bTurkey\b|\bTurkiye\b|\bTürkiye\b/g, 'Turquia'],
+  [/\bUnited States\b/g, 'Estados Unidos'],
+  // "match points" da Olimpíada: ponto de match, nunca "ponto de partida"
+  // só com número antes ("um ponto de partida à frente"); "o ponto de partida da campanha" fica
+  [/\b(um|meio|dois|tr[eê]s|\d+(?:[,.]\d+)?) (pontos?) de partida\b/g, '$1 $2 de match'],
+];
+
+export function fixSpelling(text) {
+  return SPELLING.reduce((t, [re, to]) => t.replace(re, to), text);
+}
+
 export function copiedRun(sentence, sourceText, n = 10) {
   const w = words(sentence);
   if (w.length < n) return false;

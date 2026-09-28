@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { SOURCES, isKnownItemId, wantsOgImage } from '../src/data/sources.ts';
 import { fetchOgImage, notPhoto, parseSource } from '../src/lib/rss.ts';
-import { copiedRun, essentials, feedOverlap, fetchArticle, hasQuote, isPortuguese, parseChecks, sentences } from './articles.mjs';
+import { copiedRun, essentials, feedOverlap, fetchArticle, fixSpelling, hasQuote, isPortuguese, parseChecks, sentences } from './articles.mjs';
 import { fetchTop } from './fide.mjs';
 import { fetchRecentGames, linkGame } from './games.mjs';
 
@@ -96,7 +96,7 @@ if (!PROVIDERS.length) {
 // Glossário que evita os erros mais comuns da IA com notícias de xadrez
 const GLOSSARY = `Glossário de xadrez (obrigatório):
 - "3 0", "3+0", "3|2", "5+3", "10+0" são CONTROLES DE TEMPO (blitz/rápido), nunca placares. "3 0 Thursday" = torneio de blitz 3+0 de quinta-feira.
-- "2.5-1.5" em Olimpíada é placar de match (4 tabuleiros); "16/18 pontos de match" não são partidas.
+- "2.5-1.5" em Olimpíada é placar de match (4 tabuleiros); "16/18 pontos de match" não são partidas. "Match point(s)" = "ponto(s) de match", nunca "ponto de partida".
 - "swindle" = virada de partida perdida; "Titled Tuesday" é um torneio online semanal; "norm" = norma de título (GM, IM, WGM).
 - Brancas (white) e pretas (black) nunca podem ser trocadas.`;
 
@@ -565,7 +565,11 @@ try {
 }
 
 // 6) Grava (mantém só traduções de itens que ainda estão nos feeds)
-const keep = Object.fromEntries(fresh.filter((i) => pt[i.id]).map((i) => [i.id, pt[i.id]]));
+// manchetes e resumos curtos também passam pela revisão de grafia (Uzbekistan → Uzbequistão etc.)
+const spell = (t) => (typeof t === 'string' ? fixSpelling(t) : t);
+const keep = Object.fromEntries(
+  fresh.filter((i) => pt[i.id]).map((i) => [i.id, { ...pt[i.id], title: spell(pt[i.id].title), summary: spell(pt[i.id].summary), safeTitle: spell(pt[i.id].safeTitle) }]),
+);
 // se nada passou (IA fora do ar), mantém a edição anterior em vez de publicar vazio.
 // Edição anterior sem kicker ou título em texto (digest de versão antiga) é consertada aqui.
 // Item de fonte que saiu da lista (o r/chess) não volta por ela: sai da história, e a história
@@ -800,7 +804,9 @@ const WEEK = 7 * 24 * 3600 * 1000;
 const keepArticle = (id, a) =>
   byId.has(id) || (failedFeeds.has(sourceOfId(id)) && Date.now() - Date.parse(a?.generatedAt) < WEEK);
 const articles = Object.fromEntries(
-  Object.entries(prev.articles ?? {}).filter(([id, a]) => keepArticle(id, a) && (!a.paragraphs?.length || isPortuguese(a.paragraphs.join(' ')))),
+  Object.entries(prev.articles ?? {})
+    .filter(([id, a]) => keepArticle(id, a) && (!a.paragraphs?.length || isPortuguese(a.paragraphs.join(' '))))
+    .map(([id, a]) => [id, { ...a, paragraphs: (a.paragraphs ?? []).map(fixSpelling) }]),
 );
 const hasText = (a) => Array.isArray(a?.paragraphs) && a.paragraphs.length > 0;
 // Matéria descartada fica registrada sem texto (o app ignora) e só é tentada de novo depois de 24 h,
@@ -965,7 +971,8 @@ try {
         discard(`fora do português; ${spent}`);
         continue;
       }
-      articles[it.id] = { paragraphs, words: countWords(paragraphs), source: sourceName(it), generatedAt: new Date().toISOString() };
+      const fixed = paragraphs.map(fixSpelling);
+      articles[it.id] = { paragraphs: fixed, words: countWords(fixed), source: sourceName(it), generatedAt: new Date().toISOString() };
       runArticles.ok++;
       console.log(`  resumo ok: ${label} (${kept}/${list.length} frases, ${tally}, ${articles[it.id].words} palavras; ${spent})`);
       // checkpoint: se cair depois, a próxima execução não refaz o que já foi resumido
@@ -1010,7 +1017,7 @@ try {
       const cached = doneStories.get(storyKey(st));
       // texto guardado de uma execução antiga que saiu com trecho em outro idioma é refeito
       if (cached && isPortuguese(cached.body.join(' '))) {
-        st.body = cached.body;
+        st.body = cached.body.map(fixSpelling);
         st.why = typeof cached.why === 'string' ? cached.why : '';
         continue;
       }
@@ -1082,7 +1089,7 @@ try {
         fail(st, `fora do português; ${cost()} tokens`);
         continue;
       }
-      st.body = body;
+      st.body = body.map(fixSpelling);
       // "por que importa" só entra inteiro: uma frase sem base derruba a seção
       const whyOk = whyList.length > 0 && whyList.every((s, n) => ok(bodyList.length + n, s));
       st.why = whyOk ? whyList.join(' ') : '';
