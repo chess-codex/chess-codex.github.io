@@ -1,7 +1,7 @@
 // Partidas do dia: baixa as rodadas recentes das transmissões de elite do Lichess (API pública)
 // e acha a posição decisiva de cada jogo pela avaliação do motor lance a lance.
 // Tudo aqui é cálculo sobre o PGN: nenhuma frase é escrita por IA.
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { Chess } from 'chess.js';
 
@@ -170,6 +170,11 @@ export function keyMoment(ev, result) {
 const ENGINE_DEPTH = 12; // ~4 s por partida no GitHub; basta para achar o erro decisivo
 const ENGINE_GAMES = 24; // quantas partidas (as mais notícia) passam pelo Stockfish por execução
 const KEY_DEPTH = 16; // os números mostrados no momento decisivo saem de análise mais funda
+// Cache de TODAS as partidas analisadas (não só as publicadas), guardado pelo actions/cache entre
+// execuções: partida terminada não muda, e reanalisar as 24 custava ~3 min por execução.
+// Fica fora do site: o app não baixa isso. Guarda também "sem momento decisivo", para não repetir.
+const ENGINE_CACHE = new URL('../.cache/engine.json', import.meta.url);
+const ENGINE_CACHE_MAX = 400;
 
 /**
  * Reavalia as partidas com o nosso Stockfish e recalcula o momento decisivo.
@@ -179,21 +184,37 @@ const KEY_DEPTH = 16; // os números mostrados no momento decisivo saem de anál
 export async function analyzeWithEngine(games) {
   let cache = new Map();
   try {
+    const saved = JSON.parse(readFileSync(ENGINE_CACHE, 'utf8'));
+    cache = new Map((Array.isArray(saved) ? saved : []).filter((g) => g?.key).map((g) => [g.key, g]));
+  } catch {
+    // primeira execução com cache (ou cache perdido): usa o que o digest anterior publicou
+  }
+  try {
     const prev = JSON.parse(readFileSync(new URL('../src/data/digest.json', import.meta.url), 'utf8'));
-    cache = new Map((prev.games ?? []).filter((g) => g.engine === 'Stockfish 19').map((g) => [g.key, g]));
+    for (const g of prev.games ?? []) if (g.engine === 'Stockfish 19' && !cache.has(g.key)) cache.set(g.key, g);
   } catch {
     // sem digest anterior: analisa tudo
   }
+  let hits = 0;
+  // usada agora vai para o fim da fila: o corte do cache tira as que ninguém usa há mais tempo
+  const touch = (key, value) => {
+    cache.delete(key);
+    cache.set(key, value);
+  };
   const engine = await createEngine({ depth: ENGINE_DEPTH });
   const deep = await createEngine({ depth: KEY_DEPTH });
   const out = [];
   try {
     for (const g of games) {
       const old = cache.get(g.key);
-      if (old && old.moves.length === g.moves.length) {
-        out.push({ ...g, ...old });
+      if (old && (old.moves?.length ?? old.plies) === g.moves.length) {
+        hits++;
+        touch(g.key, old);
+        if (!old.none) out.push({ ...g, ...old });
         continue;
       }
+      // "sem momento decisivo" também vai para o cache (a partida é igual na próxima execução)
+      const none = () => touch(g.key, { key: g.key, plies: g.moves.length, none: true });
       try {
         const ch = new Chess();
         const fens = [ch.fen()];
@@ -204,13 +225,19 @@ export async function analyzeWithEngine(games) {
         const ev = [];
         for (let i = 1; i < fens.length; i++) ev.push((await engine.evaluate(fens[i])) ?? ev[i - 2] ?? 0.2);
         let k = keyMoment(ev, g.result);
-        if (!k) continue;
+        if (!k) {
+          none();
+          continue;
+        }
         // confirma os números do momento decisivo (e dos vizinhos) com análise funda
         for (let i = Math.max(0, k.keyPly - 2); i <= Math.min(ev.length - 1, k.keyPly + 1); i++) {
           ev[i] = (await deep.evaluate(fens[i + 1])) ?? ev[i];
         }
         k = keyMoment(ev, g.result);
-        if (!k) continue;
+        if (!k) {
+          none();
+          continue;
+        }
         out.push({
           ...g,
           evals: ev.map((e) => Math.round(e * 10) / 10),
@@ -226,7 +253,17 @@ export async function analyzeWithEngine(games) {
     engine.quit();
     deep.quit();
   }
-  return out.map(({ clocks, ...g }) => g);
+  const result = out.map(({ clocks, ...g }) => g);
+  console.log(`Stockfish: ${games.length - hits} analisadas agora, ${hits} do cache`);
+  try {
+    for (const g of result) touch(g.key, g);
+    mkdirSync(new URL('../.cache/', import.meta.url), { recursive: true });
+    // as mais novas ficam (a Map guarda a ordem de inserção)
+    writeFileSync(ENGINE_CACHE, JSON.stringify([...cache.values()].slice(-ENGINE_CACHE_MAX)));
+  } catch (e) {
+    console.warn(`cache do Stockfish não gravado: ${e.message}`);
+  }
+  return result;
 }
 
 /** Quão "notícia" é a partida: força dos jogadores + drama + resultado. */
@@ -294,7 +331,7 @@ export async function fetchRecentGames({ topSurnames = [], limit = 16 } = {}) {
   const withTop = (g) => [g.whiteSurname, g.blackSurname].some((s) => topSurnames.includes(s.toLowerCase()));
   const toAnalyze = candidates.filter((g, i) => i < ENGINE_GAMES || withTop(g));
   const unique = await analyzeWithEngine(toAnalyze);
-  console.log(`Stockfish: ${unique.length} de ${toAnalyze.length} partidas reanalisadas`);
+  console.log(`Stockfish: ${unique.length} de ${toAnalyze.length} partidas com momento decisivo`);
   unique.sort((a, b) => gameScore(b, topSurnames) - gameScore(a, topSurnames));
   // variedade: as 4 melhores de cada seção/evento primeiro (ex.: feminino não some atrás do aberto)
   const picked = [];

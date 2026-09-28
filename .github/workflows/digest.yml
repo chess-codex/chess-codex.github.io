@@ -30,6 +30,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # análises do Stockfish de execuções anteriores (scripts/games.mjs): a chave muda a cada execução
+      # para o cache ser regravado no fim; restore-keys pega o mais recente
+      - uses: actions/cache@v4
+        with:
+          path: .cache
+          key: engine-${{ github.run_id }}
+          restore-keys: engine-
       # restaura o digest anterior para só traduzir itens novos. Baixa num arquivo à parte e só troca
       # se o JSON estiver inteiro: download cortado não pode derrubar o robô nem o build do site
       - run: |
