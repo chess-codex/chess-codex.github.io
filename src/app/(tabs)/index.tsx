@@ -23,7 +23,8 @@ export default function Today() {
   const c = usePalette();
   const { refreshing, refresh, settings, setSettings, updatedAt } = useStore();
   const { highlights, news } = useToday();
-  const games = useGames().slice(0, 12);
+  // só as partidas de destaque; a que veio só por causa de uma notícia aparece dentro dela
+  const games = useGames().filter((g) => !g.linked).slice(0, 12);
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
   // largura real do carrossel: na web a coluna tem teto (760), menor que a janela

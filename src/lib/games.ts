@@ -29,6 +29,8 @@ export type Game = {
   keyAfter: number;
   keyClock: number | null;
   comeback: number | null;
+  // veio só porque uma notícia fala dela: aparece na notícia, não em "Partidas do dia"
+  linked?: boolean;
 };
 
 type Legacy = {

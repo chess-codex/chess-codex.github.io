@@ -275,7 +275,12 @@ export function gameScore(g, topSurnames = []) {
 }
 
 /** Rodadas das últimas horas nos eventos de elite (tier 4 e 5), incluindo as seções irmãs (ex.: feminino). */
-export async function fetchRecentGames({ topSurnames = [], limit = 16 } = {}) {
+// partidas a mais, além das ENGINE_GAMES, só porque o jogador aparece nas notícias do dia
+const NEWS_GAMES = 30;
+
+// newsText: manchetes e resumos do dia. Partida de jogador citado nas notícias também passa pelo
+// Stockfish, mesmo fora das mais fortes: a notícia sobre ela mostra o jogo (não vira "Partidas do dia")
+export async function fetchRecentGames({ topSurnames = [], limit = 16, newsText = '' } = {}) {
   const tours = new Map();
   for (const page of [1, 2]) {
     const top = await json(`https://lichess.org/api/broadcast/top?page=${page}`);
@@ -329,7 +334,11 @@ export async function fetchRecentGames({ topSurnames = [], limit = 16 } = {}) {
   // são reanalisadas pelo nosso Stockfish, e só essas podem ser publicadas ou ligadas a notícias
   candidates.sort((a, b) => gameScore(b, topSurnames) - gameScore(a, topSurnames));
   const withTop = (g) => [g.whiteSurname, g.blackSurname].some((s) => topSurnames.includes(s.toLowerCase()));
-  const toAnalyze = candidates.filter((g, i) => i < ENGINE_GAMES || withTop(g));
+  const cited = (s) => s.length >= 4 && new RegExp(`(^|[^\\p{L}])${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}])`, 'iu').test(newsText);
+  let extra = 0;
+  const inNews = (g) => !!newsText && extra < NEWS_GAMES && (cited(g.whiteSurname) || cited(g.blackSurname)) && ++extra > 0;
+  const toAnalyze = candidates.filter((g, i) => i < ENGINE_GAMES || withTop(g) || inNews(g));
+  if (extra) console.log(`Stockfish: ${extra} partidas a mais de jogadores citados nas notícias`);
   const unique = await analyzeWithEngine(toAnalyze);
   console.log(`Stockfish: ${unique.length} de ${toAnalyze.length} partidas com momento decisivo`);
   unique.sort((a, b) => gameScore(b, topSurnames) - gameScore(a, topSurnames));

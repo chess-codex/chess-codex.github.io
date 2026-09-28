@@ -610,7 +610,12 @@ const topSurnames = players.filter((p) => p.list === 'open').map((p) => p.aliase
 let games = prev.games ?? [];
 let allGames = games;
 try {
-  ({ featured: games, all: allGames } = await fetchRecentGames({ topSurnames }));
+  // jogadores citados nas notícias do dia: as partidas deles também passam pelo Stockfish
+  const newsText = fresh
+    .filter((i) => ['jornal', 'geral'].includes(KIND.get(i.source)) && pt[i.id]?.relevant !== false)
+    .map((i) => `${i.title} ${i.excerpt} ${pt[i.id]?.title ?? ''} ${pt[i.id]?.summary ?? ''}`)
+    .join('\n');
+  ({ featured: games, all: allGames } = await fetchRecentGames({ topSurnames, newsText }));
 } catch (e) {
   console.warn(`partidas: ${errText(e)}`);
 }
@@ -629,7 +634,8 @@ try {
         continue;
       }
       tr.gameKey = match.key;
-      if (!games.some((g) => g.key === match.key)) games.push(match);
+      // linked: vai no digest para a notícia mostrar, mas não entra em "Partidas do dia" (só destaques)
+      if (!games.some((g) => g.key === match.key)) games.push({ ...match, linked: true });
       linked++;
     } catch (e) {
       console.warn(`  partida não ligada: ${i.title} (${errText(e).slice(0, 80)})`);
@@ -673,7 +679,7 @@ for (const st of stories) {
     const match = linkGame(text, allGames, topSurnames, newest);
     st.gameKey = match?.key;
     // partida citada que não estava entre as de destaque também vai no digest
-    if (match && !games.some((g) => g.key === match.key)) games.push(match);
+    if (match && !games.some((g) => g.key === match.key)) games.push({ ...match, linked: true });
     if (match) console.log(`  partida ligada: ${st.title} ← ${match.white} x ${match.black}`);
   } catch (e) {
     console.warn(`  partida não ligada: ${st.title} (${errText(e).slice(0, 80)})`);

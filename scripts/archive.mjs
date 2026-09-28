@@ -52,7 +52,8 @@ const news = (digest.feed ?? [])
     image: i.image ?? null,
   }));
 
-const games = (digest.games ?? []).slice(0, 8).map((g) => ({
+// só as partidas de destaque (as ligadas a uma notícia não são "Partidas do dia")
+const games = (digest.games ?? []).filter((g) => !g.linked).slice(0, 8).map((g) => ({
   white: g.white,
   black: g.black,
   result: g.result,
