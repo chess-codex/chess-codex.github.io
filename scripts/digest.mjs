@@ -1095,8 +1095,9 @@ try {
       const original = its.map((it) => `${it.title}. ${it.excerpt}`).join('\n');
       const thirdWords = countWords([original]);
       // com pouco material, pedir um texto obrigaria a IA a completar com o que não está nas fontes
-      if (thirdWords < 120) {
-        console.log(`  texto pulado (material curto, ${thirdWords} palavras): ${st.title}`);
+      // o resumo checado da matéria (texto nosso) também é material
+      if (thirdWords + countWords(summaries.filter(Boolean)) < 120) {
+        console.log(`  texto pulado (material curto, ${thirdWords + countWords(summaries.filter(Boolean))} palavras): ${st.title}`);
         continue;
       }
       const target = Math.min(180, Math.round((thirdWords + countWords(summaries)) * 0.6));

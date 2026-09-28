@@ -4,6 +4,7 @@ import { EDITION, type MicroArticle } from '@/data/edition';
 import { BUNDLED_PLAYERS, type Player } from '@/data/players';
 import type { FeedItem } from './rss';
 import { useStore } from './store';
+import { overlap, titleWords } from './titles';
 
 export type Category = 'torneios' | 'jogadores' | 'ciencia' | 'cultura' | 'plataformas' | 'polemica' | 'video' | 'outro';
 export type Translation = {
@@ -55,9 +56,31 @@ export function useArticles(): MicroArticle[] {
     );
     if (!stories.length) return EDITION.articles;
     const byId = new Map([...digest.feed, ...items].map((i) => [i.id, i]));
+    // matérias com texto nosso completo (já conferido): o destaque sem texto corrido usa o da
+    // própria fonte ou o da matéria irmã (mesmo fato, outra fonte), que entra na cobertura e
+    // assim não aparece de novo solta no Hoje
+    const paras = (id: string) => digest.articles?.[id]?.paragraphs?.filter((p) => typeof p === 'string' && p.trim()) ?? [];
+    const withText = [...byId.values()].filter((i) => paras(i.id).length);
+    const used = new Set<string>();
     return stories.map((s, n) => {
-      const refs = s.itemIds.map((id) => byId.get(id)).filter((i): i is FeedItem => i != null);
-      const body = s.body?.filter((p) => typeof p === 'string' && p.trim());
+      let refs = s.itemIds.map((id) => byId.get(id)).filter((i): i is FeedItem => i != null);
+      let body = s.body?.filter((p) => typeof p === 'string' && p.trim());
+      if (!body?.length) {
+        const words = titleWords(text(s.title));
+        const own = refs.find((r) => paras(r.id).length);
+        const sister =
+          own ??
+          withText
+            .filter((i) => !used.has(i.id))
+            .map((i) => ({ i, o: Math.max(overlap(words, titleWords(digest.items[i.id]?.title ?? '')), overlap(words, titleWords(i.title))) }))
+            .filter((x) => x.o >= 0.5)
+            .sort((a, b) => b.o - a.o)[0]?.i;
+        if (sister) {
+          used.add(sister.id);
+          body = paras(sister.id);
+          if (!refs.some((r) => r.id === sister.id)) refs = [...refs, sister];
+        }
+      }
       // why '' = as fontes não sustentam: não cai no contexto antigo, que não foi checado.
       // Só digest sem o campo why usa o context.
       const context = typeof s.why === 'string' ? s.why.trim() || undefined : s.context;

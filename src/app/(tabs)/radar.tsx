@@ -8,6 +8,8 @@ import { usePlayers, type Category } from '@/lib/digest';
 import type { FeedItem } from '@/lib/rss';
 import { useStore, useVisibleItems } from '@/lib/store';
 import { font, usePalette } from '@/lib/theme';
+import { sameFact, similar, titleWords } from '@/lib/titles';
+import { useToday } from '@/lib/today';
 
 // Radar = tudo sobre xadrez fora das redações: vida dos jogadores, ciência, cultura,
 // vídeos, redes sociais, polêmicas e o que a comunidade está discutindo.
@@ -40,12 +42,24 @@ export default function Radar() {
   const [filter, setFilter] = useState<Filter>('tudo');
   const players = usePlayers();
   const top10 = useMemo(() => players.filter((p) => p.list === 'open'), [players]);
+  // o que já está no Hoje (pelo link ou pela mesma manchete em outra fonte) não se repete aqui
+  const { highlights, news } = useToday();
+  const inToday = useMemo(() => {
+    const stories = [...highlights, ...news.flatMap((e) => ('story' in e ? [e.story] : []))];
+    const urls = new Set([...stories.flatMap((a) => a.coverage.map((x) => x.url)), ...news.flatMap((e) => ('item' in e ? [e.item.url] : []))]);
+    const words = [
+      ...stories.map((a) => titleWords(a.title)),
+      ...news.flatMap((e) => ('item' in e ? [titleWords(digest.items[e.item.id]?.title ?? e.item.title)] : [])),
+    ];
+    return (i: FeedItem) => urls.has(i.url) || words.some((w) => sameFact(w, titleWords(digest.items[i.id]?.title ?? i.title)));
+  }, [highlights, news, digest]);
 
   const match = useCallback(
     (i: FeedItem) => {
       const kind = sourceById(i.source).kind;
       const tr = digest.items[i.id];
       if (tr && !tr.relevant) return false;
+      if (inToday(i)) return false;
       // Top 10 FIDE: tudo que cita alguém do top 10, de qualquer fonte (inclusive redações)
       if (filter === 'top10') return mentions(`${i.title} ${i.excerpt} ${tr?.title ?? ''}`, top10).length > 0;
       if (kind === 'jornal') return false;
@@ -58,9 +72,20 @@ export default function Radar() {
       if (filter === 'ciencia') return cat === 'ciencia' || cat === 'cultura';
       return cat === filter;
     },
-    [digest, filter, top10],
+    [digest, filter, top10, inToday],
   );
-  const items = useVisibleItems(match);
+  const found = useVisibleItems(match);
+  // o mesmo fato em várias fontes vira um item só (o mais novo; a lista já vem do mais novo)
+  const items = useMemo(() => {
+    const seen: Set<string>[] = [];
+    return found.filter((i) => {
+      const w = titleWords(digest.items[i.id]?.title ?? i.title);
+      // entre itens do Radar, só manchete quase igual: "China vence" e "Uzbequistão vence" ficam os dois
+      if (seen.some((x) => similar(x, w))) return false;
+      seen.push(w);
+      return true;
+    });
+  }, [found, digest]);
 
   return (
     <FlatList
@@ -85,7 +110,7 @@ export default function Radar() {
       ListEmptyComponent={<Text style={[styles.empty, { color: c.muted }]}>Nada por aqui agora. Puxe para atualizar.</Text>}
       ListFooterComponent={
         <Text style={[styles.note, { color: c.muted }]}>
-          Imprensa geral, YouTube, perfis no Bluesky e no Mastodon e blogs de xadrez. Cada item leva à publicação original.
+          Imprensa geral, YouTube, perfis no Bluesky e no Mastodon e blogs de xadrez. O que já está no Hoje não se repete aqui. Cada item leva à publicação original.
         </Text>
       }
       contentContainerStyle={{ paddingBottom: 32 }}

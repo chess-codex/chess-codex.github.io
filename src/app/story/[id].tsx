@@ -77,7 +77,12 @@ export default function Story() {
   const listOpen = hidden || open;
   // Sem o texto corrido do robô, o "O que aconteceu" sai dos resumos curtos em PT de cada fonte
   // (já prontos no digest), com o nome de quem publicou: a página nunca fica só com links
-  const recap = a.body?.length
+  // sem texto corrido da história, vale o texto completo (já conferido) de uma das matérias dela
+  const articleBody = a.body?.length
+    ? null
+    : (a.coverage.map((cv) => byUrl.get(cv.url)?.id).map((id) => (id ? digest.articles?.[id] : undefined)).find((t) => t?.paragraphs?.some((p) => p.trim())) ?? null);
+  const body = a.body?.length ? a.body : (articleBody?.paragraphs.filter((p) => p.trim()) ?? []);
+  const recap = body.length
     ? []
     : [...new Map((a.points ?? []).filter((p) => p.text?.trim() && p.text !== a.dek).map((p) => [p.text, p])).values()].slice(0, 4);
 
@@ -149,10 +154,10 @@ export default function Story() {
         {!hidden ? (
           <>
             {/* texto corrido do robô substitui os tópicos: os dois contariam a mesma coisa */}
-            {a.body?.length ? (
+            {body.length ? (
               <View style={{ gap: 12 }}>
                 <Text style={[styles.blockLabel, { color: c.muted }]}>O QUE ACONTECEU</Text>
-                {a.body.map((p, i) => (
+                {body.map((p, i) => (
                   <Text key={i} style={[styles.bodyTxt, { color: c.ink, fontSize: 17 * s, lineHeight: 26 * s }]}>{p}</Text>
                 ))}
               </View>
@@ -197,9 +202,9 @@ export default function Story() {
             ) : null}
 
             {/* só o texto corrido é do robô; a edição de exemplo foi escrita à mão */}
-            {a.body?.length ? (
+            {body.length ? (
               <Text style={[styles.note, { color: c.muted, borderTopColor: c.hairline }]}>
-                Resumo automático do Chess Codex, conferido frase a frase com {joinNames(names)}. Em caso de dúvida, vale o original.
+                Resumo automático do Chess Codex, conferido frase a frase com {articleBody?.source ?? joinNames(names)}. Em caso de dúvida, vale o original.
               </Text>
             ) : recap.length ? (
               <Text style={[styles.note, { color: c.muted, borderTopColor: c.hairline }]}>
