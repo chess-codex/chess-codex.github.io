@@ -1,21 +1,22 @@
-The MIT License (MIT)
+Copyright (c) 2026 Chess Codex. Todos os direitos reservados.
 
-Copyright (c) 2015-present 650 Industries, Inc. (aka Expo)
+Este repositório é público apenas para hospedar o site chess-codex.github.io.
+Nenhuma licença é concedida: é proibido copiar, modificar, distribuir ou usar
+este código, a marca Chess Codex (nome, coruja e identidade visual) ou o
+conteúdo gerado por ele, no todo ou em parte, sem autorização por escrito.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+As notícias resumidas citam e linkam as fontes originais, que mantêm os
+direitos sobre as próprias matérias.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+O esqueleto inicial do app veio do modelo da Expo (create-expo-app),
+licenciado sob MIT: Copyright (c) 2015-present 650 Industries, Inc. (Expo).
+Bibliotecas de terceiros seguem as próprias licenças (ver package.json).
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+---
+
+Copyright (c) 2026 Chess Codex. All rights reserved.
+
+This repository is public only to host the chess-codex.github.io website.
+No license is granted: copying, modifying, distributing or using this code,
+the Chess Codex brand (name, owl and visual identity) or the content it
+generates, in whole or in part, is prohibited without written permission.
