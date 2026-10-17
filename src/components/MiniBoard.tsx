@@ -5,7 +5,24 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { track } from '@/lib/analytics';
-import { fig, fmtEval, gameStory, keyCaption, keyTitle, moveLabel, puzzlePly, resultLabel, sideName, winnerName, type Ending, type Game } from '@/lib/games';
+import {
+  cleanSan,
+  fig,
+  fmtEval,
+  fmtLine,
+  gameStory,
+  keyCaption,
+  keyTitle,
+  moveLabel,
+  puzzleAlts,
+  puzzlePly,
+  refuteLine,
+  resultLabel,
+  sideName,
+  winnerName,
+  type Ending,
+  type Game,
+} from '@/lib/games';
 import { gameRevealId, useResultHidden } from '@/lib/spoiler';
 import { useStore } from '@/lib/store';
 import { font, radius, usePalette } from '@/lib/theme';
@@ -32,8 +49,6 @@ export function usePositions(game: Game) {
   }, [game]);
 }
 
-const clean = (san: string) => san.replace(/[+#!?]/g, '');
-
 // ritmo do "rodar a partida": dá tempo de ver o lance sem arrastar
 const AUTOPLAY_MS = 1100;
 
@@ -57,13 +72,31 @@ export function ResultVeil({ label = 'Resultado oculto: toque em mostrar', onPre
  * Tabuleiro da notícia. Abre logo depois do erro decisivo com um desafio jogável
  * ("ache o lance que puniu o erro"); depois deixa navegar pela partida inteira.
  * `onReveal` avisa a página quando o resultado é revelado aqui (a notícia revela junto).
+ * `moveList` liga a lista de lances tocável embaixo dos controles (tela da partida).
  */
-export function MiniBoard({ game, ply, caption, showLink = true, onReveal }: { game: Game; ply?: number; caption?: string; showLink?: boolean; onReveal?: () => void }) {
+export function MiniBoard({
+  game,
+  ply,
+  caption,
+  showLink = true,
+  moveList = false,
+  onReveal,
+}: {
+  game: Game;
+  ply?: number;
+  caption?: string;
+  showLink?: boolean;
+  moveList?: boolean;
+  onReveal?: () => void;
+}) {
   const c = usePalette();
   const puzzle = ply == null ? puzzlePly(game) : null;
   const start = puzzle ?? ply ?? game.keyPly; // posição inicial = antes do lance em destaque
   const [cur, setCur] = useState(start);
   const [solved, setSolved] = useState(false);
+  // resolvido com outro lance que também ganha (keyAlts): a legenda mostra o da partida
+  const [altSolved, setAltSolved] = useState(false);
+  const [showMoves, setShowMoves] = useState(false);
   // "revealed" aqui é a resposta do desafio; o resultado da partida é do Anti-Spoiler (hideResult)
   const [revealed, setRevealed] = useState(puzzle == null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -96,6 +129,9 @@ export function MiniBoard({ game, ply, caption, showLink = true, onReveal }: { g
     if (!challenge || !selected) return [];
     return new Chess(positions.fens[cur]).moves({ square: selected as Square, verbose: true }).map((m) => m.to);
   }, [challenge, selected, positions, cur]);
+  const alts = useMemo(() => puzzleAlts(game), [game]);
+  // linha do motor depois do erro: só aparece quando o desafio acabou (é a resposta dele)
+  const refute = useMemo(() => (puzzle != null ? refuteLine(game) : []), [game, puzzle]);
 
   // um lance por vez; no último o autoplay desliga, e lances novos de partida ao vivo não o religam
   useEffect(() => {
@@ -127,10 +163,13 @@ export function MiniBoard({ game, ply, caption, showLink = true, onReveal }: { g
       return;
     }
     setSelected(null);
-    if (clean(san) === clean(game.moves[cur])) {
+    const exact = cleanSan(san) === cleanSan(game.moves[cur]);
+    if (exact || alts.includes(cleanSan(san))) {
       setSolved(true);
+      setAltSolved(!exact);
       setRevealed(true);
       setFeedback(null);
+      // o tabuleiro segue a partida: mostra o lance que foi jogado, com a seta
       setCur(cur + 1);
       track('challenge_solved', { game: game.key });
     } else {
@@ -163,6 +202,32 @@ export function MiniBoard({ game, ply, caption, showLink = true, onReveal }: { g
     track('autoplay', { game: game.key });
   };
 
+  // a lista de lances mostra a resposta do desafio e, pelo último lance (#) e pela contagem,
+  // o resultado: abrir conta como revelar os dois
+  const listOpen = showMoves && !challenge && !hideResult;
+  const listHint =
+    challenge && hideResult
+      ? 'Mostrar (revela o desafio e o resultado)'
+      : challenge
+        ? 'Mostrar (revela o desafio)'
+        : hideResult
+          ? 'Mostrar (revela o resultado)'
+          : 'Mostrar';
+  const toggleMoves = () => {
+    if (listOpen) {
+      setShowMoves(false);
+      return;
+    }
+    if (challenge) {
+      track('challenge_revealed', { game: game.key });
+      setRevealed(true);
+      setSelected(null);
+      setFeedback(null);
+    }
+    if (hideResult) revealResult();
+    setShowMoves(true);
+  };
+
   const winner = winnerName(game);
   const errorBy = game.keyPly % 2 === 0 ? game.whiteSurname : game.blackSurname;
   // no Anti-Spoiler nenhum texto do tabuleiro cita o vencedor antes de revelar
@@ -171,6 +236,16 @@ export function MiniBoard({ game, ply, caption, showLink = true, onReveal }: { g
   const playHint = challenge
     ? 'Revela a resposta do desafio e roda a partida desde o primeiro lance'
     : running ? 'Para a partida no lance atual' : 'Mostra a partida lance a lance, sozinha';
+  // outro lance que o motor aprova também vale; a legenda conta o que foi jogado na partida
+  const solvedTxt = !solved
+    ? ''
+    : !altSolved
+      ? `Isso! ${moveLabel(game, shown)} foi o lance da partida.`
+      : hideResult || !winner
+        ? `Também pune o erro! Na partida, o lance foi ${moveLabel(game, shown)}.`
+        : `Também ganha! Na partida, ${winner} jogou ${moveLabel(game, shown)}.`;
+  // a linha do motor sai sem número de avaliação, mas no Anti-Spoiler a legenda fica só com a posição
+  const refuteTxt = !hideResult && refute.length ? ` Linha do motor: ${fmtLine(game.keyPly + 1, refute)}.` : '';
 
   return (
     <View style={[styles.wrap, { backgroundColor: c.surface, borderColor: c.hairline }]}>
@@ -205,7 +280,9 @@ export function MiniBoard({ game, ply, caption, showLink = true, onReveal }: { g
               : `${errorBy} acabou de jogar ${moveLabel(game, game.keyPly)} e a avaliação foi de ${fmtEval(game.keyBefore)} para ${fmtEval(game.keyAfter)}.`}
             {' '}Jogam as {sideName(cur % 2 === 0)}: {punish}
           </Text>
-          <Text style={[styles.hint, { color: c.muted }]}>Toque na peça e depois na casa de destino.</Text>
+          <Text style={[styles.hint, { color: c.muted }]}>
+            Toque na peça e depois na casa de destino.{alts.length ? ' Há mais de um lance que funciona.' : ''}
+          </Text>
         </View>
       ) : null}
 
@@ -242,7 +319,7 @@ export function MiniBoard({ game, ply, caption, showLink = true, onReveal }: { g
         </View>
       ) : (
         <Text style={[styles.caption, { color: c.inkSoft }]}>
-          {solved ? <Text style={{ fontFamily: font.bold, color: '#3FB950' }}>Isso! {moveLabel(game, shown)} foi o lance da partida.{'\n'}</Text> : null}
+          {solved ? <Text style={{ fontFamily: font.bold, color: '#3FB950' }}>{solvedTxt}{'\n'}</Text> : null}
           <Text style={{ fontFamily: font.bold, color: c.whisky }}>{keyTitle(game, hideResult)}: </Text>
           {/* legenda escrita à mão pode citar a avaliação: no Anti-Spoiler fica só a posição */}
           {hideResult
@@ -251,6 +328,7 @@ export function MiniBoard({ game, ply, caption, showLink = true, onReveal }: { g
               : keyCaption(game, true)
             : (caption ?? keyCaption(game))}
           {answer}
+          {refuteTxt}
         </Text>
       )}
 
@@ -277,6 +355,46 @@ export function MiniBoard({ game, ply, caption, showLink = true, onReveal }: { g
         <Ctl icon="locate" label="Ir ao lance decisivo" onPress={() => go(game.keyPly)} />
       </View>
 
+      {moveList ? (
+        <View style={[styles.list, { borderTopColor: c.hairline }]}>
+          <Pressable
+            onPress={toggleMoves}
+            style={styles.listHead}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: listOpen }}
+          >
+            <Text style={[styles.listLabel, { color: c.muted }]}>TODOS OS LANCES</Text>
+            <Text style={[styles.toggle, { color: c.accent }]}>{listOpen ? 'Esconder' : listHint}</Text>
+          </Pressable>
+          {listOpen ? (
+            // um botão por lance (não Text aninhado): alvo de toque maior e o leitor de tela alcança cada um
+            <View style={styles.moveGrid}>
+              {game.moves.map((m, i) => {
+                const now = i === cur - 1;
+                const decisive = i === game.keyPly;
+                const n = Math.floor(i / 2) + 1;
+                return (
+                  <Pressable
+                    key={i}
+                    onPress={() => go(i + 1)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Lance ${n}${i % 2 ? ' das pretas' : ''}: ${m}${decisive ? ', lance decisivo' : ''}`}
+                    accessibilityState={{ selected: now }}
+                    style={({ pressed }) => [styles.chip, { backgroundColor: now ? c.whiskySoft : 'transparent', opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <Text style={[styles.chipTxt, { color: decisive ? c.whisky : c.inkSoft }, now || decisive ? { fontFamily: font.bold } : null]}>
+                      {i % 2 === 0 ? <Text style={{ color: c.muted }}>{`${n}. `}</Text> : null}
+                      {fig(m)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {showLink ? (
         <Pressable
           onPress={() => {
@@ -302,6 +420,8 @@ export function GameStory({ game, onReveal }: { game: Game; onReveal?: () => voi
   const { reveal } = useStore();
   const hideResult = useResultHidden(game.key);
   const { ending } = usePositions(game);
+  // o relato confere as linhas do motor no tabuleiro: calcula uma vez por partida
+  const paragraphs = useMemo(() => (hideResult ? [] : gameStory(game, ending)), [hideResult, game, ending]);
   if (hideResult) {
     return (
       <ResultVeil
@@ -312,7 +432,6 @@ export function GameStory({ game, onReveal }: { game: Game; onReveal?: () => voi
       />
     );
   }
-  const paragraphs = gameStory(game, ending);
   return (
     <View style={{ gap: 10 }}>
       {paragraphs.map((p, i) => (
@@ -366,6 +485,13 @@ const styles = StyleSheet.create({
   moveInfo: { flex: 1, alignItems: 'center' },
   moveTxt: { fontFamily: font.semibold, fontSize: 14 },
   evalTxt: { fontFamily: font.regular, fontSize: 12 },
+  list: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, gap: 8 },
+  listHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  listLabel: { fontFamily: font.bold, fontSize: 11, letterSpacing: 1.2 },
+  toggle: { fontFamily: font.semibold, fontSize: 13, flexShrink: 1, textAlign: 'right' },
+  moveGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2 },
+  chip: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 5 },
+  chipTxt: { fontFamily: font.regular, fontSize: 14, lineHeight: 19 },
   more: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
   moreTxt: { fontFamily: font.semibold, fontSize: 13.5 },
   story: { fontFamily: font.regular, fontSize: 16, lineHeight: 24 },

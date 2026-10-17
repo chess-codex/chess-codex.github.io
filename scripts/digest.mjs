@@ -16,9 +16,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { SOURCES, isKnownItemId, wantsOgImage } from '../src/data/sources.ts';
 import { fetchOgImage, notPhoto, parseSource } from '../src/lib/rss.ts';
 import { CHECK_PROMPT, CHECK_RULES, GLOSSARY } from './prompts.mjs';
-import { copiedRun, essentials, feedOverlap, fetchArticle, fixSpelling, hasQuote, isPortuguese, parseChecks, sentences } from './articles.mjs';
+import { copiedRun, essentials, feedOverlap, fetchArticle, fixSpelling, hasQuote, isPortuguese, notPortuguese, parseChecks, sentences } from './articles.mjs';
 import { fetchTop } from './fide.mjs';
-import { fetchRecentGames, linkGame } from './games.mjs';
+import { fetchRecentGames, linkGame, staleGames } from './games.mjs';
 import { channelOf, fetchYouTube } from './youtube.mjs';
 
 const OUT = new URL('../src/data/digest.json', import.meta.url);
@@ -76,7 +76,7 @@ const WRITE_TOKENS = 1200; // resumo de até ~200 palavras com raciocínio 'low'
 // Uma nota por frase com raciocínio 'medium'. Na execução de 27/09, a matéria de 9 frases gastou 7.131
 // tokens, ~4,7 mil deles de entrada: sobram ~2,5 mil de saída entre escrita e checagem, e a checagem
 // fica perto de 1.500. Com limite de 1.500, a resposta sairia cortada boa parte das vezes, e a matéria
-// ficaria 24 h sem nova tentativa com a escrita já paga. Limite maior não custa nada a mais (o
+// ficaria 8 h (RETRY_FAILED) sem nova tentativa com a escrita já paga. Limite maior não custa nada a mais (o
 // orçamento conta o usage), e ~2,2 mil de entrada + 3 mil cabem nos 8 mil tokens por minuto
 const CHECK_TOKENS = 3000;
 const POINTS_TOKENS = 2500; // lote de 10 resumos curtos com raciocínio 'medium'
@@ -84,6 +84,10 @@ const POINTS_TOKENS = 2500; // lote de 10 resumos curtos com raciocínio 'medium
 // palavras da fonte tem, em português, 15 palavras ou mais
 const LITERAL_MIN_WORDS = 15;
 const RETRY_FAILED = 8 * 3600 * 1000; // matéria descartada é tentada de novo depois de 8 h
+// Falha passageira (checagem desalinhada, texto que saiu fora do português): não diz nada do
+// conteúdo, então a próxima execução já tenta de novo. Repetida esse número de vezes seguidas,
+// vira falha comum e espera RETRY_FAILED (senão cada execução pagaria de novo pela mesma falha)
+const TRANSIENT_TRIES = 2;
 
 const STRONG_MAIN = 'groq/gpt-oss-120b';
 // o que o revisor da NVIDIA (NVIDIA_CHECK_MODEL, ver bench-checker.mjs) aceita: effort = raciocínio fixo
@@ -151,6 +155,10 @@ const exhausted = new Set(); // IAs sem cota do dia: não adianta esperar nem te
 // IA que estourou o tempo limite vai para o fim da fila no resto da execução (continua de reserva):
 // a NVIDIA grátis às vezes fica lenta de madrugada, e cada espera custava 90 s
 const slow = new Set();
+// a segunda vez sem resposta na mesma execução tira a IA da fila até o fim dela (travou de vez)
+const down = new Set();
+// IAs puladas ou que falharam antes da que respondeu na última chamada, com o motivo (vai para o log)
+let lastSkips = [];
 let tokensUsed = 0; // soma do usage de todas as chamadas desta execução
 const modelTokens = {}; // o mesmo, por IA: cada modelo tem a sua cota diária
 let lastProvider = null; // IA que deu a última resposta: quem escreveu não confere o próprio texto
@@ -246,12 +254,14 @@ async function callProvider(p, system, user, maxTokens, effort) {
 }
 
 // order: nomes das IAs permitidas, na ordem de preferência (texto próprio só com IA forte, STRONG);
-// sem nenhuma disponível, lança erro
-async function ai(system, user, maxTokens, effort = 'low', order = LIGHT) {
-  const list = order
-    .map((name) => PROVIDERS.find((p) => p.name === name))
-    .filter((p) => p && !exhausted.has(p.name))
-    .sort((a, b) => slow.has(a.name) - slow.has(b.name));
+// sem nenhuma disponível, lança erro. last: IA que fica no fim da fila mesmo com outra lenta na
+// frente (na conferência, quem escreveu: revisor lento ainda é melhor que conferir o próprio texto)
+async function ai(system, user, maxTokens, effort = 'low', order = LIGHT, { last: pinned } = {}) {
+  const known = order.map((name) => PROVIDERS.find((p) => p.name === name)).filter(Boolean);
+  lastSkips = known.filter((p) => exhausted.has(p.name) || down.has(p.name)).map((p) => `${p.name} ${exhausted.has(p.name) ? 'sem cota do dia' : 'sem resposta duas vezes nesta execução'}`);
+  const list = known
+    .filter((p) => !exhausted.has(p.name) && !down.has(p.name))
+    .sort((a, b) => (a.name === pinned) - (b.name === pinned) || slow.has(a.name) - slow.has(b.name));
   if (!list.length) throw new Error(order === STRONG ? 'nenhuma IA forte disponível' : 'nenhuma IA disponível');
   const errors = [];
   for (const p of list) {
@@ -262,9 +272,15 @@ async function ai(system, user, maxTokens, effort = 'low', order = LIGHT) {
       return out;
     } catch (e) {
       errors.push(e);
-      if (e?.name === 'TimeoutError' && !slow.has(p.name)) {
-        slow.add(p.name);
-        console.warn(`  ${p.name}: sem resposta em ${AI_TIMEOUT / 1000}s, vai para o fim da fila nesta execução`);
+      lastSkips.push(`${p.name} falhou (${errText(e).slice(0, 60)})`);
+      if (e?.name === 'TimeoutError') {
+        if (!slow.has(p.name)) {
+          slow.add(p.name);
+          console.warn(`  ${p.name}: sem resposta em ${AI_TIMEOUT / 1000}s, vai para o fim da fila nesta execução`);
+        } else {
+          down.add(p.name);
+          console.warn(`  ${p.name}: sem resposta pela segunda vez, fica de fora no resto da execução`);
+        }
       }
       console.warn(`  ${p.name}: ${errText(e)} → tentando a próxima IA`);
     }
@@ -383,12 +399,24 @@ for (const t of Object.values(pt)) {
 // vídeos mantêm o título original do YouTube de propósito; fonte em português já chega traduzida
 const KIND = new Map(SOURCES.map((s) => [s.id, s.kind]));
 const LANG = new Map(SOURCES.map((s) => [s.id, s.lang]));
-const untranslated = (i) => pt[i.id] && LANG.get(i.source) !== 'pt' && KIND.get(i.source) !== 'video' && pt[i.id].title.trim() === i.title.trim();
+// manchete que voltou igual ao original: compara só letras e números, porque a IA tira o emoji e o
+// ponto final ("♟️Cto. del Mundo... Ronda 3." volta "Cto. del Mundo... Ronda 3") e ela continuava em espanhol
+const sameTitle = (a, b) => {
+  const norm = (s) => String(s ?? '').normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  return norm(a) === norm(b);
+};
+const needsTranslation = (i) => LANG.get(i.source) !== 'pt' && KIND.get(i.source) !== 'video';
+// Título que segue no idioma original vai de novo para a IA, até TRANSLATE_TRIES vezes: nome próprio
+// ("Dortmund Sparkassen Trophy 2027") volta igual toda vez, e reenviar sem limite gastava cota à toa
+const TRANSLATE_TRIES = 3;
+const untranslated = (i) => pt[i.id] && needsTranslation(i) && sameTitle(pt[i.id].title, i.title) && (Number(pt[i.id].tries) || 0) < TRANSLATE_TRIES;
 // redações e imprensa primeiro (são o Hoje e as histórias); dentro de cada grupo, a ordem de fresh
 // (do mais novo para o mais velho; o sort é estável). O que passar de MAX_TRANSLATE fica para a próxima execução.
+// (O item do "3 0 Thursday" ia de novo para a IA em toda execução, mesmo já traduzido, e a resposta
+// em inglês apagava o título em português: o glossário já trata o nome, e a regex saiu.)
 const trRank = (i) => (['jornal', 'geral'].includes(KIND.get(i.source)) ? 0 : 1);
 const waiting = fresh
-  .filter((i) => !pt[i.id] || untranslated(i) || /\b\d\s?[+|]?\s?\d\s+(Thursday|Tuesday|Arena)/i.test(i.title))
+  .filter((i) => !pt[i.id] || untranslated(i))
   .sort((a, b) => trRank(a) - trRank(b));
 const todo = waiting.slice(0, MAX_TRANSLATE);
 console.log(`${fresh.length} itens, ${waiting.length} para a IA, ${todo.length} nesta execução (${chain(LIGHT)})`);
@@ -427,7 +455,16 @@ for (let k = 0; k < todo.length; k += BATCH) {
   }
   for (const r of Array.isArray(out?.items) ? out.items : []) {
     if (!r || !batch.some((i) => i.id === r.id) || typeof r.title !== 'string' || !r.title.trim()) continue;
+    const orig = byId.get(r.id);
+    const still = needsTranslation(orig) && sameTitle(r.title, orig.title);
+    // voltou no idioma original e o item já tinha registro: fica o anterior inteiro (título em PT,
+    // resumo já conferido, partida ligada) e só a tentativa é contada
+    if (still && pt[r.id]) {
+      pt[r.id] = { ...pt[r.id], tries: (Number(pt[r.id].tries) || 0) + 1 };
+      continue;
+    }
     pt[r.id] = {
+      ...(still ? { tries: 1 } : {}),
       title: r.title.trim(),
       // resumo novo começa sem conferência (checked): o app só o mostra depois dela
       summary: typeof r.summary === 'string' ? r.summary.trim() : '',
@@ -606,18 +643,35 @@ try {
 }
 
 // 5) Partidas do dia (transmissões do Lichess) com a posição decisiva; se falhar, mantém as anteriores
-const topSurnames = players.filter((p) => p.list === 'open').map((p) => p.aliases.at(-1).toLowerCase());
+// sobrenome como no PGN; ranking gravado antes do campo surname cai no id ("open-so" -> "so")
+const topSurnames = players.filter((p) => p.list === 'open').map((p) => String(p.surname ?? p.id.replace(/^open-/, '')).toLowerCase());
 let games = prev.games ?? [];
 let allGames = games;
+// gamesInfo: o app usa mode para o título ("Partidas do dia" ou "Partidas recentes") e stale para
+// avisar que a busca de agora falhou; updatedAt é a hora da última busca que deu certo
+let gamesInfo = prev.gamesInfo ?? null;
 try {
   // jogadores citados nas notícias do dia: as partidas deles também passam pelo Stockfish
   const newsText = fresh
     .filter((i) => ['jornal', 'geral'].includes(KIND.get(i.source)) && pt[i.id]?.relevant !== false)
     .map((i) => `${i.title} ${i.excerpt} ${pt[i.id]?.title ?? ''} ${pt[i.id]?.summary ?? ''}`)
     .join('\n');
-  ({ featured: games, all: allGames } = await fetchRecentGames({ topSurnames, newsText }));
+  const found = await fetchRecentGames({ topSurnames, newsText });
+  ({ featured: games, all: allGames } = found);
+  // partial: o Lichess parou de responder no meio; sai o que veio, marcado como desatualizado
+  const now = new Date().toISOString();
+  gamesInfo = { mode: found.mode, stale: !!found.partial, updatedAt: found.partial ? (prev.gamesInfo?.updatedAt ?? now) : now };
+  if (found.partial) console.log(`partidas: busca incompleta, última completa em ${gamesInfo.updatedAt}`);
 } catch (e) {
   console.warn(`partidas: ${errText(e)}`);
+  // ficam as anteriores, mas o que passou de 72 h sai do destaque: com o Lichess bloqueando, o robô
+  // chegou a republicar por dias as mesmas partidas como "do dia"
+  const kept = staleGames(prev.games);
+  games = kept.featured;
+  allGames = kept.all;
+  const updatedAt = prev.gamesInfo?.updatedAt ?? kept.newest ?? prev.generatedAt ?? new Date().toISOString();
+  gamesInfo = { mode: kept.mode, stale: true, updatedAt };
+  console.log(`partidas: mantidas de ${updatedAt} (${games.length} em destaque${kept.dropped ? `, ${kept.dropped} com mais de 72 h fora` : ''})`);
 }
 
 // 5b) Liga a partida também às notícias avulsas das Notícias do dia (as histórias são ligadas mais
@@ -745,15 +799,40 @@ const rebuild = (list, keep) => {
 };
 
 // um {v, literal} por frase; null se a resposta veio desalinhada (aí não dá para confiar e o texto sai)
-// writer: a IA que escreveu. A conferência vai para outra (checkOrder); lastChecker diz quem conferiu
+// writer: a IA que escreveu. A conferência vai para outra (checkOrder), e quem escreveu é sempre a
+// última da fila, mesmo com o outro revisor lento; lastChecker diz quem conferiu
 let lastChecker = null;
 async function checkSentences(list, reference, writer) {
   await sleep(AI_PAUSE);
   const payload = JSON.stringify({ frases: list.map((texto, n) => ({ n: n + 1, texto })), referencia: reference });
-  const out = await ai(CHECK_PROMPT, payload, CHECK_TOKENS, 'medium', checkOrder(writer));
-  lastChecker = lastProvider;
-  if (lastChecker === writer) console.log(`  conferência pela mesma IA que escreveu (${writer}): revisores fora do ar`);
-  return parseChecks(out, list.length);
+  const order = checkOrder(writer);
+  // why: o motivo do log quando nenhuma outra IA foi pulada ou falhou nesta chamada
+  const ask = async (names, why) => {
+    const out = await ai(CHECK_PROMPT, payload, CHECK_TOKENS, 'medium', names, { last: writer });
+    lastChecker = lastProvider;
+    if (lastChecker === writer) console.log(`  conferência pela mesma IA que escreveu (${writer}): ${lastSkips.join('; ') || why}`);
+    return out;
+  };
+  const out = await ask(order, 'nenhum outro revisor configurado');
+  const checks = parseChecks(out, list.length);
+  if (checks) return checks;
+  // Resposta desalinhada (nota faltando, repetida ou fora de ordem): uma segunda chance com outro
+  // revisor antes de jogar fora um texto que já foi pago. Falha nela não é IA fora do ar: devolve null
+  const first = lastChecker;
+  const got = Array.isArray(out?.ok) ? `${out.ok.length} notas` : 'sem a lista de notas';
+  const others = order.filter((n) => n !== first && PROVIDERS.some((p) => p.name === n));
+  console.log(`  conferência desalinhada (${first}: ${got} para ${list.length} frases)${others.length ? `; conferindo de novo com ${others.join(' → ')}` : ''}`);
+  if (!others.length) return null;
+  try {
+    await sleep(AI_PAUSE);
+    const again = parseChecks(await ask(others, `${first} respondeu desalinhado`), list.length);
+    if (!again) console.log(`  conferência desalinhada de novo (${lastChecker})`);
+    return again;
+  } catch (e) {
+    console.warn(`  segunda conferência falhou (${errText(e).slice(0, 80)})`);
+    lastChecker = first;
+    return null;
+  }
 }
 // "escrita nvidia → conferência nvidia-check", para o log e para o registro da matéria
 const byLine = (writer) => `escrita ${writer} → conferência ${lastChecker}`;
@@ -888,35 +967,64 @@ const articles = Object.fromEntries(
     .map(([id, a]) => [id, { ...a, paragraphs: (a.paragraphs ?? []).map(fixSpelling) }]),
 );
 const hasText = (a) => Array.isArray(a?.paragraphs) && a.paragraphs.length > 0;
-// Matéria descartada fica registrada sem texto (o app ignora) e só é tentada de novo depois de 24 h,
-// para não queimar cota toda execução com a mesma página.
-const remember = (it) => {
+// Matéria descartada fica registrada sem texto (o app ignora) e só é tentada de novo depois de
+// RETRY_FAILED (8 h), para não queimar cota toda execução com a mesma página. Falha passageira
+// (transient) fica registrada só com a contagem: a próxima execução tenta de novo, e a que repete
+// TRANSIENT_TRIES vezes seguidas vira falha comum. Devolve o texto para o log.
+const remember = (it, transient = false) => {
   const now = new Date().toISOString();
-  articles[it.id] = { paragraphs: [], words: 0, source: sourceName(it), generatedAt: now, failedAt: now };
+  const tries = transient ? (Number(articles[it.id]?.transient) || 0) + 1 : 0;
+  const again = transient && tries < TRANSIENT_TRIES;
+  articles[it.id] = { paragraphs: [], words: 0, source: sourceName(it), generatedAt: now, ...(again ? { transient: tries } : { failedAt: now }) };
+  if (!transient) return '';
+  return again ? '; falha passageira, tenta de novo na próxima execução' : `; ${tries}ª falha passageira seguida, nova tentativa depois de ${RETRY_FAILED / 3600000} h`;
 };
-const due = (a) => !a || (!hasText(a) && !(Date.now() - Date.parse(a.failedAt ?? a.generatedAt) < RETRY_FAILED));
+const due = (a) => !a || (!hasText(a) && (Number(a.transient) > 0 || !(Date.now() - Date.parse(a.failedAt ?? a.generatedAt) < RETRY_FAILED)));
 
-// Texto das histórias (7b) que já existe ou falhou há menos de 24 h, pela lista de fontes: mesmas
-// fontes = mesmo texto, sem gastar IA. Fica aqui em cima para 7a saber quanto orçamento guardar para 7b.
+// Texto das histórias (7b) que já existe ou falhou há menos de RETRY_FAILED (8 h), pela lista de
+// fontes: mesmas fontes = mesmo texto, sem gastar IA. Fica aqui em cima para 7a saber quanto orçamento
+// guardar para 7b.
 const storyKey = (s) => [...(Array.isArray(s.itemIds) ? s.itemIds : [])].sort().join('|');
+// edição anterior mantida (agrupamento sem resposta): a matéria irmã que 7b juntou às fontes dela
+// sai antes de tudo, para a chave ser a mesma das fontes do agrupamento
+for (const st of stories) {
+  if (st?.bodyAdded && typeof st.bodyFrom === 'string' && Array.isArray(st.itemIds)) st.itemIds = st.itemIds.filter((id) => id !== st.bodyFrom);
+}
 let doneStories = new Map();
 let failedStories = new Map();
+let retryStories = new Map();
 try {
   const prevStories = (Array.isArray(prev.stories) ? prev.stories : []).filter((s) => s && typeof s === 'object');
-  doneStories = new Map(prevStories.filter((s) => Array.isArray(s.body) && s.body.length).map((s) => [storyKey(s), s]));
+  // só o texto escrito para a história; o resumo de matéria usado no lugar dele (bodyFrom) é refeito
+  // a cada execução, sem custo, e não impede uma nova tentativa do texto próprio
+  doneStories = new Map(prevStories.filter((s) => Array.isArray(s.body) && s.body.length && !s.bodyFrom).map((s) => [storyKey(s), s]));
   // Texto descartado fica registrado na própria história (textFailedAt + textKey, o app ignora) e,
-  // com as mesmas fontes, só é tentado de novo depois de 24 h, como as matérias em 7a.
+  // com as mesmas fontes, só é tentado de novo depois de RETRY_FAILED, como as matérias em 7a.
+  // Falha passageira fica só com a contagem (textRetries + textKey) e é tentada na próxima execução.
+  const keyOf = (s) => (typeof s.textKey === 'string' ? s.textKey : storyKey(s));
   failedStories = new Map(
     prevStories
       .filter((s) => typeof s.textFailedAt === 'string' && Date.now() - Date.parse(s.textFailedAt) < RETRY_FAILED)
-      .map((s) => [typeof s.textKey === 'string' ? s.textKey : storyKey(s), s.textFailedAt]),
+      .map((s) => [keyOf(s), s.textFailedAt]),
   );
+  retryStories = new Map(prevStories.filter((s) => Number(s.textRetries) > 0).map((s) => [keyOf(s), Number(s.textRetries)]));
 } catch (e) {
   console.warn(`textos anteriores das histórias ilegíveis (${errText(e).slice(0, 80)})`);
 }
 // texto próprio só em história com redação entre as fontes (nada só de blog; post de rede social nem entra em história)
 const storyHasJornal = (st) => (st.itemIds ?? []).some((id) => KIND.get(byId.get(id)?.source ?? sourceOfId(id)) === 'jornal');
-const storyNeedsText = (st) => storyHasJornal(st) && !doneStories.has(storyKey(st)) && !failedStories.has(storyKey(st));
+// material das histórias só de redações e imprensa: texto da comunidade não entra
+const storySources = (st) =>
+  (st.itemIds ?? [])
+    .map((id) => byId.get(id))
+    .filter((it) => it && ['jornal', 'geral'].includes(KIND.get(it.source)))
+    .slice(0, 5);
+// história de fonte única cuja matéria já tem resumo checado não gasta IA (7b usa o resumo)
+const singleWithText = (st) => {
+  const its = storySources(st);
+  return its.length === 1 && hasText(articles[its[0].id]);
+};
+const storyNeedsText = (st) => storyHasJornal(st) && !doneStories.has(storyKey(st)) && !failedStories.has(storyKey(st)) && !singleWithText(st);
 
 // 7a) Resumo das matérias. Ordem: as que estão nas histórias do Hoje, depois as das redações e por
 // fim as da imprensa com página própria; dentro de cada grupo, da mais nova para a mais velha.
@@ -960,9 +1068,9 @@ try {
     const label = pt[it.id]?.title ?? it.title;
     let t0 = null; // tokensUsed quando a IA começa a trabalhar nesta matéria
     const cost = () => (t0 === null ? 0 : tokensUsed - t0);
-    const discard = (why) => {
-      remember(it);
-      console.log(`  resumo descartado (${why}): ${label}`);
+    const discard = (why, transient = false) => {
+      const next = remember(it, transient);
+      console.log(`  resumo descartado (${why}${next}): ${label}`);
     };
     try {
       const text = await fetchArticle(it.url);
@@ -1029,7 +1137,7 @@ try {
       full.chars += essential.length;
       const spent = `${byLine(writer)}; ${cost()} tokens: escrita ${write.tokens} (raciocínio ${write.reasoning}) + checagem ${check.tokens} (raciocínio ${check.reasoning}); trecho de ${essential.length} caracteres`;
       if (!checks) {
-        discard(`checagem incompleta; ${spent}`);
+        discard(`checagem incompleta; ${spent}`, true);
         continue;
       }
       // literal pega a tradução quase palavra por palavra de frase longa; copiedRun, a cópia de fonte em português
@@ -1058,8 +1166,9 @@ try {
         continue;
       }
       const paragraphs = rebuild(list, mask);
-      if (!isPortuguese(paragraphs.join(' '))) {
-        discard(`fora do português; ${spent}`);
+      const notPt = notPortuguese(paragraphs.join(' '));
+      if (notPt) {
+        discard(`fora do português: ${notPt}; ${spent}`, true);
         continue;
       }
       const fixed = paragraphs.map(fixSpelling);
@@ -1070,8 +1179,9 @@ try {
       writeFileSync(OUT, JSON.stringify({ ...prev, items: pt, articles, usage: usageNow() }));
     } catch (e) {
       if (isRequestError(e)) {
-        // o pedido desta matéria é que falhou (JSON inválido, resposta cortada, grande demais):
-        // entra na memória de 24 h e a próxima matéria segue, porque a IA está no ar
+        // o pedido desta matéria é que falhou (JSON inválido, resposta cortada, grande demais; repetir
+        // não resolve): entra na memória de 8 h e a próxima matéria segue, porque a IA está no ar.
+        // IA fora do ar (o else) não entra na memória: a matéria volta na próxima execução
         discard(`pedido recusado: ${errText(e).slice(0, 60)}; ${cost()} tokens`);
       } else {
         aiFailures++;
@@ -1090,41 +1200,116 @@ try {
 }
 
 // 7b) "O que aconteceu" e "Por que importa" de cada história. Mesmas fontes = mesmo texto (sem gastar IA).
+// História sem texto próprio usa o resumo checado da matéria da própria fonte ou, sem ele, o da
+// matéria irmã (mesmo fato, outra fonte), como o app já fazia: assim o "O que aconteceu" e o arquivo
+// também recebem o texto. Cada história sem texto escrito agora diz no log o motivo.
 try {
-  const fail = (st, why) => {
-    st.textFailedAt = new Date().toISOString();
-    st.textKey = storyKey(st);
-    console.log(`  texto descartado (${why}): ${st.title}`);
+  // mesma comparação de manchetes do app (src/lib/titles.ts): palavras de 4+ letras ou números, sem acento
+  const titleWords = (s) =>
+    new Set(String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 || /^\d+$/.test(w)));
+  const titleOverlap = (a, b) => {
+    if (!a.size || !b.size) return 0;
+    let common = 0;
+    for (const w of a) if (b.has(w)) common++;
+    return common / (a.size + b.size - common);
+  };
+  // matéria que já é fonte de uma história ou já deu o texto de outra não serve de irmã
+  const inStories = new Set(stories.flatMap((s) => s.itemIds ?? []));
+  const usedArticles = new Set();
+  const tally = { written: 0, cached: 0, article: 0, none: 0 };
+  const hhmm = (ms) => new Date(ms).toISOString().slice(11, 16);
+  // texto da história = resumo checado da matéria (sem IA); devolve o que aconteceu, para o log
+  const fromArticle = (st) => {
+    const own = (st.itemIds ?? []).find((id) => hasText(articles[id]) && !usedArticles.has(id));
+    let id = own;
+    if (!id) {
+      const words = titleWords(st.title);
+      id = fresh
+        .filter((i) => hasText(articles[i.id]) && !inStories.has(i.id) && !usedArticles.has(i.id))
+        .map((i) => ({ id: i.id, o: Math.max(titleOverlap(words, titleWords(pt[i.id]?.title)), titleOverlap(words, titleWords(i.title))) }))
+        .filter((x) => x.o >= 0.5)
+        .sort((a, b) => b.o - a.o)[0]?.id;
+    }
+    if (!id) {
+      tally.none++;
+      return 'fica sem texto (nenhuma matéria dela ou irmã com resumo checado)';
+    }
+    usedArticles.add(id);
+    st.body = [...articles[id].paragraphs];
+    st.why = ''; // o resumo da matéria não tem "por que importa" checado
+    st.bodyFrom = id;
+    if (!own) {
+      // a irmã entra nas fontes: o app dá o crédito e não a mostra de novo solta no Hoje (nem o arquivo)
+      st.itemIds = [...st.itemIds, id];
+      st.bodyAdded = true;
+      inStories.add(id);
+    }
+    tally.article++;
+    return `usa o resumo checado da matéria ${own ? 'da fonte' : 'irmã'} (${articles[id].source})`;
+  };
+  const skip = (st, why) => console.log(`  texto pulado (${why}) → ${fromArticle(st)}: ${st.title}`);
+  // Falha de conteúdo (frases sem base, resposta vazia, longa demais, pedido recusado) espera
+  // RETRY_FAILED; falha passageira (checagem desalinhada, fora do português) tenta de novo na próxima
+  // execução, até TRANSIENT_TRIES vezes seguidas. textKey é a chave das fontes antes da matéria irmã.
+  const fail = (st, why, transient = false) => {
+    const key = storyKey(st);
+    const tries = transient ? (retryStories.get(key) ?? 0) + 1 : 0;
+    st.textKey = key;
+    let next;
+    if (transient && tries < TRANSIENT_TRIES) {
+      st.textRetries = tries;
+      delete st.textFailedAt;
+      next = 'falha passageira, tenta de novo na próxima execução';
+    } else {
+      st.textFailedAt = new Date().toISOString();
+      delete st.textRetries;
+      next = `${transient ? `${tries}ª falha passageira seguida; ` : ''}nova tentativa depois de ${RETRY_FAILED / 3600000} h`;
+    }
+    console.log(`  texto descartado (${why}; ${next}) → ${fromArticle(st)}: ${st.title}`);
   };
   for (const st of stories) {
     let t0 = null; // tokensUsed quando a IA começa a trabalhar nesta história
     const cost = () => (t0 === null ? 0 : tokensUsed - t0);
+    const key = storyKey(st);
+    const cached = doneStories.get(key);
+    // campos de texto da edição anterior (quando ela é mantida) são decididos de novo aqui
+    for (const f of ['body', 'why', 'bodyFrom', 'bodyAdded', 'textFailedAt', 'textRetries', 'textKey']) delete st[f];
+    // falha passageira anterior segue contada até a próxima tentativa
+    if (retryStories.has(key)) {
+      st.textRetries = retryStories.get(key);
+      st.textKey = key;
+    }
     try {
       if (!storyHasJornal(st)) {
-        delete st.body;
-        delete st.why;
+        const gnews = (st.itemIds ?? []).every((id) => byId.get(id)?.url?.startsWith('https://news.google.com/'));
+        skip(st, gnews ? 'só Google Notícias, sem a página da matéria' : 'sem redação entre as fontes');
         continue;
       }
-      const cached = doneStories.get(storyKey(st));
       // texto guardado de uma execução antiga que saiu com trecho em outro idioma é refeito
       if (cached && isPortuguese(cached.body.join(' '))) {
         st.body = cached.body.map(fixSpelling);
         st.why = typeof cached.why === 'string' ? cached.why : '';
+        tally.cached++;
         continue;
       }
-      const failedAt = failedStories.get(storyKey(st));
+      const its = storySources(st);
+      // fonte única com resumo checado: o texto da história seria reescrever esse resumo, com custo
+      if (its.length === 1 && hasText(articles[its[0].id])) {
+        skip(st, 'fonte única com resumo checado');
+        continue;
+      }
+      const failedAt = failedStories.get(key);
       if (failedAt) {
-        // o registro segue na história para a próxima execução também pular até vencer as 24 h
+        // o registro segue na história para a próxima execução também pular até vencer as 8 h
         st.textFailedAt = failedAt;
-        st.textKey = storyKey(st);
+        st.textKey = key;
+        skip(st, `texto falhou às ${hhmm(Date.parse(failedAt))} UTC, nova tentativa a partir das ${hhmm(Date.parse(failedAt) + RETRY_FAILED)}`);
         continue;
       }
-      if (textStop(STORY_EST)) continue;
-      // material só de redações e imprensa: texto da comunidade não entra
-      const its = (st.itemIds ?? [])
-        .map((id) => byId.get(id))
-        .filter((it) => it && ['jornal', 'geral'].includes(KIND.get(it.source)))
-        .slice(0, 5);
+      if (textStop(STORY_EST)) {
+        skip(st, 'texto próprio parado');
+        continue;
+      }
       const summaries = its.map((it) => (hasText(articles[it.id]) ? articles[it.id].paragraphs.join(' ') : ''));
       const material = its
         .map((it, n) =>
@@ -1144,7 +1329,7 @@ try {
       // com pouco material, pedir um texto obrigaria a IA a completar com o que não está nas fontes
       // o resumo checado da matéria (texto nosso) também é material
       if (thirdWords + countWords(summaries.filter(Boolean)) < 120) {
-        console.log(`  texto pulado (material curto, ${thirdWords + countWords(summaries.filter(Boolean))} palavras): ${st.title}`);
+        skip(st, `material curto, ${thirdWords + countWords(summaries.filter(Boolean))} palavras`);
         continue;
       }
       // micro-artigo: o destaque também fica em até 120 palavras
@@ -1167,7 +1352,7 @@ try {
       }
       const checks = await checkSentences([...bodyList.map((x) => x.s), ...whyList], material, writer);
       if (!checks) {
-        fail(st, `checagem incompleta; ${cost()} tokens`);
+        fail(st, `checagem incompleta; ${cost()} tokens`, true);
         continue;
       }
       const ok = (n, s) => checks[n].v && !isLiteral(checks[n], s) && !copiedRun(s, original);
@@ -1179,8 +1364,9 @@ try {
         continue;
       }
       const body = rebuild(bodyList, mask);
-      if (!isPortuguese(body.join(' '))) {
-        fail(st, `fora do português; ${cost()} tokens`);
+      const notPt = notPortuguese(body.join(' '));
+      if (notPt) {
+        fail(st, `fora do português: ${notPt}; ${cost()} tokens`, true);
         continue;
       }
       st.body = body.map(fixSpelling);
@@ -1189,17 +1375,21 @@ try {
       st.why = whyOk ? whyList.join(' ') : '';
       delete st.textFailedAt;
       delete st.textKey;
+      delete st.textRetries;
+      tally.written++;
       console.log(`  texto ok: ${st.title} (${kept}/${bodyList.length} frases${st.why ? ', com "por que importa"' : ''}; ${byLine(writer)}; ${cost()} tokens, ${textSpent()} no texto até aqui)`);
     } catch (e) {
       if (isRequestError(e)) {
-        // o pedido desta história é que falhou: memória de 24 h, e as outras seguem
+        // o pedido desta história é que falhou (repetir não resolve): memória de 8 h, e as outras seguem
         fail(st, `pedido recusado: ${errText(e).slice(0, 60)}; ${cost()} tokens`);
       } else {
+        // IA fora do ar: sem memória, a história volta na próxima execução
         aiFailures++;
-        console.warn(`  texto falhou: ${st.title} (${errText(e).slice(0, 80)})`);
+        console.warn(`  texto falhou: ${st.title} (${errText(e).slice(0, 80)}) → ${fromArticle(st)}`);
       }
     }
   }
+  console.log(`textos das histórias: ${tally.written} escritos agora, ${tally.cached} guardados, ${tally.article} com o resumo checado de uma matéria, ${tally.none} sem texto`);
 } catch (e) {
   console.warn(`textos das histórias: ${errText(e)}`);
 }
@@ -1207,7 +1397,7 @@ try {
 // resumos (e registros de falha) de itens que ainda estão no feed ou de fonte cujo feed falhou agora
 const keptArticles = Object.fromEntries(Object.entries(articles).filter(([id, a]) => keepArticle(id, a)));
 // usage: consumo de tokens do dia (UTC), lido de volta na próxima execução para o limite diário
-const digest = { generatedAt: new Date().toISOString(), model: [...used].join(', '), feed: fresh, items: keep, articles: keptArticles, stories, players, games, usage: usageNow() };
+const digest = { generatedAt: new Date().toISOString(), model: [...used].join(', '), feed: fresh, items: keep, articles: keptArticles, stories, players, games, gamesInfo, usage: usageNow() };
 writeFileSync(OUT, JSON.stringify(digest));
 mkdirSync(new URL('../docs/', import.meta.url), { recursive: true });
 writeFileSync(PAGES, JSON.stringify(digest));

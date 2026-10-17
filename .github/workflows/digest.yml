@@ -48,6 +48,12 @@ jobs:
           curl -fsSL "https://${{ github.repository_owner }}.github.io/arquivo.json" -o /tmp/prev-arquivo.json \
             && node -e "JSON.parse(require('fs').readFileSync('/tmp/prev-arquivo.json', 'utf8'))" \
             && mv /tmp/prev-arquivo.json src/data/arquivo.json || true
+      # partidas completas das edições (o Arquivo e os links compartilhados abrem a partida no app):
+      # mesma restauração; se falhar, o archive.mjs usa a cópia do cache .cache/partidas.json
+      - run: |
+          curl -fsSL "https://${{ github.repository_owner }}.github.io/partidas.json" -o /tmp/prev-partidas.json \
+            && node -e "JSON.parse(require('fs').readFileSync('/tmp/prev-partidas.json', 'utf8'))" \
+            && mv /tmp/prev-partidas.json src/data/partidas.json || true
       # sem chave ou com a IA fora do ar, o site sai mesmo assim com o último digest
       # teto de segurança: o robô já se limita a ~12 min de texto; se algo travar, aos 20 min o site
       # sai com o que ele já gravou (checkpoints) ou com o digest anterior
@@ -69,6 +75,9 @@ jobs:
           cp src/data/digest.json docs/digest.json
           # o arquivo sai do que a execução tem (novo ou restaurado): histórico nunca some por falha
           if [ -f src/data/arquivo.json ]; then cp src/data/arquivo.json docs/arquivo.json; fi
+          # partidas: a do archive.mjs; se ele falhou, a restaurada do site ou a do cache
+          if [ -f src/data/partidas.json ]; then cp src/data/partidas.json docs/partidas.json;
+          elif [ -f .cache/partidas.json ]; then cp .cache/partidas.json docs/partidas.json; fi
           cp docs/* dist/
       # prévia do link (WhatsApp, Telegram, X, Google) e página de reserva para links diretos
       - run: node scripts/seo.mjs && cp dist/index.html dist/404.html

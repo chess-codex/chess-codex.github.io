@@ -322,32 +322,71 @@ const words = (s) =>
 let cachedSource = null;
 let cachedWords = '';
 
-// Anti-cópia: true se a frase repete n ou mais palavras seguidas do texto original
-// (sem diferenciar maiúsculas, acentos e pontuação).
-// Palavras curtas que quase só aparecem em cada idioma: bastam para separar PT de EN/ES
-const PT_WORDS = /\b(não|são|está|também|uma|dos|das|pelo|pela|foi|ao|às|em|com o|com a|que o|que a)\b|ção\b|ções\b|ões\b/gi;
-const EN_WORDS = /\b(the|and|of|was|with|his|her|their|this|that|is|were|has|have|after|won)\b/gi;
-const ES_WORDS = /\b(el|los|las|del|y|fue|con el|también|una vez|según|sus)\b|ción\b|ciones\b/gi;
+// Marcas de cada idioma: palavras curtas e termos de xadrez que quase só aparecem nele. Palavra
+// comum em PT e ES ("está", "no", "nos", "dos", "este", "a") não conta para ninguém: com ela, texto
+// em espanhol passava por português. "o", "e", "do" e "da" contam para o PT: no inglês e no espanhol
+// são raras, e a frase misturada cai na conferência por frase. Francês e alemão aparecem em alguns
+// feeds e também contam.
+// Fronteira que entende acento (o \b do JS só conhece a-z, e "está" ou "às" nunca casavam); ponto e
+// hífen também separam palavra: "Chess.com a" não é "com a" e "on-line" não é o "on" do inglês.
+const wordList = (list) => new RegExp(String.raw`(?<![\p{L}\p{N}.\-])(?:${list})(?![\p{L}\p{N}\-])`, 'giu');
+const ending = (list) => new RegExp(String.raw`(?:${list})(?![\p{L}\p{N}\-])`, 'giu');
+const PT_MARKS = [
+  wordList(
+    'o|os|e|do|da|das|não|são|também|um|uma|umas|pelo|pela|pelos|pelas|foi|ao|aos|às|em|na|nas|num|numa|após|já|seu|sua|seus|suas|é|ele|ela|eles|elas|até|então|ainda|muito|muita|isso|essa|esse|tem|têm|depois|quando|com o|com a|que o|que a|' +
+      'xadrez|torneio|torneios|rodada|rodadas|vitória|vitórias|jogador|jogadores|jogadora|jogadoras|enxadrista|enxadristas|brancas|pretas|pontos',
+  ),
+  ending('ção|ções|ões|ão'),
+];
+const OTHER_MARKS = {
+  inglês: [wordList('the|and|of|was|were|with|his|her|their|this|that|is|has|have|had|after|won|in|on|for|by|to|from|at|he|she|it|be|been|will|an|who|which|round|tournament')],
+  espanhol: [
+    wordList('el|los|las|del|y|fue|con|una|un|la|lo|es|al|pero|muy|más|según|sus|también|después|ajedrez|torneo|ronda|jugador|jugadores|victoria|puntos|blancas|negras'),
+    ending('ción|ciones'),
+  ],
+  francês: [wordList('les|des|est|une|dans|pour|avec|aux|du|le|et|qui|échecs')],
+  alemão: [wordList('und|der|die|ist|nicht|mit|ein|eine|den|dem|auf|sich|schach')],
+};
+const marks = (s, list) => list.reduce((n, re) => n + (s.match(re)?.length ?? 0), 0);
+// marcas do português, do outro idioma que mais aparece e tamanho do trecho
+function langScore(s) {
+  let other = 0;
+  let lang = '';
+  for (const [name, list] of Object.entries(OTHER_MARKS)) {
+    const n = marks(s, list);
+    if (n > other) [other, lang] = [n, name];
+  }
+  return { pt: marks(s, PT_MARKS), other, lang, words: s.split(/\s+/).filter(Boolean).length };
+}
 
 /**
- * O texto está em português? O redator às vezes responde no idioma da fonte.
- * Confere o texto inteiro e, à parte, cada citação entre aspas (citação em inglês também reprova).
+ * Por que o texto não passa como português ('' = passa); o motivo vai para o log do robô.
+ * O redator às vezes responde no idioma da fonte ou deixa nele uma frase ou uma citação.
+ * Confere o texto inteiro, com mínimo de marcas proporcional ao tamanho (2 até ~75 palavras e
+ * depois 1 a cada 30: um mínimo fixo reprovava o "O que aconteceu" curto, cheio de nomes e números),
+ * e, à parte, cada frase de 8 palavras ou mais e cada citação entre aspas: com mais marcas de outro
+ * idioma que de português, reprovam o texto todo.
  */
-export function isPortuguese(text) {
-  const score = (s) => {
-    const pt = (s.match(PT_WORDS) ?? []).length;
-    const en = (s.match(EN_WORDS) ?? []).length;
-    const es = (s.match(ES_WORDS) ?? []).length;
-    return { pt, other: Math.max(en, es) };
-  };
-  const all = score(text);
-  if (all.pt < 3 || all.pt <= all.other * 1.5) return false;
-  for (const [, q] of text.matchAll(/[“"«]([^”"»]{12,})[”"»]/g)) {
-    const s = score(q);
-    if (s.other >= 2 && s.other > s.pt) return false;
+export function notPortuguese(text) {
+  const t = String(text ?? '');
+  const all = langScore(t);
+  const min = Math.max(2, Math.round(all.words / 30));
+  if (all.pt < min || all.pt <= all.other * 1.5) {
+    return `${all.pt} marcas do português (mínimo ${min}) contra ${all.other}${all.lang ? ` do ${all.lang}` : ''} em ${all.words} palavras`;
   }
-  return true;
+  for (const s of sentences(t)) {
+    const x = langScore(s);
+    if (x.words >= 8 && x.other >= 2 && x.other > x.pt) return `frase em ${x.lang}: "${s.slice(0, 60)}"`;
+  }
+  for (const [, q] of t.matchAll(/[“"«]([^”"»]{12,})[”"»]/g)) {
+    // toda palavra com maiúscula é nome de obra ou evento ("From Talent To Title"), não fala
+    if (q.split(/\s+/).filter((w) => /^\p{L}/u.test(w)).every((w) => /^\p{Lu}/u.test(w))) continue;
+    const x = langScore(q);
+    if (x.other >= 2 && x.other > x.pt) return `citação em ${x.lang}: "${q.slice(0, 60)}"`;
+  }
+  return '';
 }
+export const isPortuguese = (text) => !notPortuguese(text);
 
 // Grafia em português de países, cidades e termos que a IA às vezes deixa no original.
 // Troca fixa, sem IA: não muda fato nenhum, só a forma de escrever.
@@ -379,6 +418,8 @@ export function fixSpelling(text) {
   return SPELLING.reduce((t, [re, to]) => t.replace(re, to), text);
 }
 
+// Anti-cópia: true se a frase repete n ou mais palavras seguidas do texto original
+// (sem diferenciar maiúsculas, acentos e pontuação).
 export function copiedRun(sentence, sourceText, n = 10) {
   const w = words(sentence);
   if (w.length < n) return false;

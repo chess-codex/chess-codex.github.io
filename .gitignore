@@ -49,3 +49,6 @@ dist/
 src/data/arquivo.json
 docs/arquivo.json
 .cache/
+
+src/data/partidas.json
+docs/partidas.json

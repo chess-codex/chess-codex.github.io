@@ -1,36 +1,58 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GameStory, MiniBoard } from '@/components/MiniBoard';
-import { openExternal } from '@/components/ui';
-import { fmtClock, fmtEval, keyCaption, keyTitle, moveLabel, resultLabel, useGame } from '@/lib/games';
+import { fmtClock, fmtEval, gameDay, gameLink, keyCaption, keyTitle, resultLabel, useGameLookup } from '@/lib/games';
 import { useResultHidden } from '@/lib/spoiler';
 import { font, radius, usePalette } from '@/lib/theme';
+
+const TC_LABEL: Record<string, string> = { blitz: 'blitz', rapid: 'xadrez rápido' };
 
 export default function GameScreen() {
   const c = usePalette();
   const insets = useSafeAreaInsets();
   const { key } = useLocalSearchParams<{ key: string }>();
-  const game = useGame(key);
+  // partida de hoje ou, se já saiu do digest, das edições anteriores (partidas.json)
+  const { game, loading, failed, retry } = useGameLookup(key);
   // mesmo "revelar" do tabuleiro e do relato: revelou num lugar, revelou na tela toda
   const hideResult = useResultHidden(key ?? '');
-  const [showMoves, setShowMoves] = useState(false);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
   if (!game) {
     return (
       <View style={[styles.empty, { backgroundColor: c.bg, paddingTop: insets.top + 40 }]}>
-        <Text style={[styles.emptyTxt, { color: c.muted }]}>Esta partida saiu da edição de hoje.</Text>
-        <Pressable onPress={back}>
-          <Text style={[styles.link, { color: c.accent }]}>Voltar</Text>
-        </Pressable>
+        {loading ? (
+          <ActivityIndicator color={c.whisky} />
+        ) : (
+          <>
+            <Text style={[styles.emptyTxt, { color: c.muted }]}>
+              {failed ? 'Não foi possível carregar esta partida agora.' : 'Não encontramos esta partida. As partidas ficam guardadas por 90 dias.'}
+            </Text>
+            {failed ? (
+              <Pressable onPress={retry}>
+                <Text style={[styles.link, { color: c.accent }]}>Tentar de novo</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={back}>
+              <Text style={[styles.link, { color: c.accent }]}>Voltar</Text>
+            </Pressable>
+          </>
+        )}
       </View>
     );
   }
+
+  // crédito certo: os lances vêm da transmissão; a análise é do nosso Stockfish (partidas antigas
+  // sem o campo engine ainda tinham a avaliação da própria transmissão)
+  const ours = game.engine?.startsWith('Stockfish');
+  const credit = ours
+    ? `Lances: transmissão oficial do torneio (Lichess) · Análise: ${game.engine}, calculada pelo Chess Codex.`
+    : 'Lances e avaliações: transmissão oficial do torneio (Lichess).';
+  const day = gameDay(game);
+  const acc = game.accuracy;
 
   // dados que saem direto do PGN e da análise do motor. No Anti-Spoiler a variação da avaliação
   // fica oculta junto com o resultado: "+1,2 → +4,7" diz quem ganhou do mesmo jeito
@@ -39,6 +61,10 @@ export default function GameScreen() {
     { label: 'Lances', value: String(Math.ceil(game.moves.length / 2)) },
     { label: 'Momento-chave', value: hideResult ? 'oculto' : `${fmtEval(game.keyBefore)} → ${fmtEval(game.keyAfter)}` },
     ...(game.keyClock != null ? [{ label: 'Relógio no lance', value: fmtClock(game.keyClock) }] : []),
+    // precisão diz quem jogou melhor: fica de fora no Anti-Spoiler
+    ...(!hideResult && acc && Number.isFinite(acc.white) && Number.isFinite(acc.black)
+      ? [{ label: 'Precisão (brancas · pretas)', value: `${Math.round(acc.white)}% · ${Math.round(acc.black)}%` }]
+      : []),
   ];
 
   return (
@@ -49,7 +75,10 @@ export default function GameScreen() {
           <Text style={[styles.barTxt, { color: c.ink }]}>Voltar</Text>
         </Pressable>
         <Pressable
-          onPress={() => Share.share({ message: `${game.white} x ${game.black} (${game.event}, ${game.round})\n${keyCaption(game, hideResult)}\n${game.url}\n\nvia Chess Codex` }).catch(() => {})}
+          // o link é a página da partida no Chess Codex, não a transmissão
+          onPress={() =>
+            Share.share({ message: `${game.white} x ${game.black} (${game.event}, ${game.round})\n${keyCaption(game, hideResult)}\n\nNo Chess Codex: ${gameLink(game.key)}` }).catch(() => {})
+          }
           hitSlop={10}
           accessibilityLabel="Compartilhar"
         >
@@ -64,7 +93,7 @@ export default function GameScreen() {
             {game.white} <Text style={{ color: c.muted }}>×</Text> {game.black}
           </Text>
           <Text style={[styles.meta, { color: c.muted }]}>
-            {[game.event, game.whiteTeam && game.blackTeam ? `${game.whiteTeam} × ${game.blackTeam}` : null, game.opening].filter(Boolean).join(' · ')}
+            {[day, TC_LABEL[game.tc ?? ''], game.event, game.whiteTeam && game.blackTeam ? `${game.whiteTeam} × ${game.blackTeam}` : null, game.opening].filter(Boolean).join(' · ')}
           </Text>
         </View>
 
@@ -82,40 +111,18 @@ export default function GameScreen() {
           <GameStory game={game} />
         </View>
 
-        <MiniBoard game={game} showLink={false} />
+        {/* a lista de lances fica dentro do tabuleiro: tocar num lance leva a posição até ele */}
+        <MiniBoard game={game} showLink={false} moveList />
 
-        <View style={[styles.block, { backgroundColor: c.surface, borderColor: c.hairline }]}>
-          <Pressable onPress={() => setShowMoves((v) => !v)} style={styles.movesHead} hitSlop={8}>
-            <Text style={[styles.blockLabel, { color: c.muted }]}>TODOS OS LANCES</Text>
-            <Text style={[styles.toggle, { color: c.accent }]}>{showMoves ? 'Esconder' : 'Mostrar (revela o desafio)'}</Text>
-          </Pressable>
-          {showMoves ? (
-          <Text style={[styles.moves, { color: c.inkSoft }]}>
-            {game.moves.map((_, i) => (
-              <Text key={i} style={i === game.keyPly ? { color: c.whisky, fontFamily: font.bold } : undefined}>
-                {i % 2 === 0 ? `${i / 2 + 1}. ` : ''}
-                {moveLabel(game, i).split(' ')[1]}{' '}
-              </Text>
-            ))}
-          </Text>
-          ) : null}
-        </View>
-
-        {game.url ? (
-          <Pressable onPress={() => openExternal(game.url)} style={[styles.cta, { backgroundColor: c.surface, borderColor: c.hairline }]}>
-            <Ionicons name="open-outline" size={18} color={c.accent} />
-            <Text style={[styles.ctaTxt, { color: c.accent }]}>Ver no Lichess, com análise completa</Text>
-          </Pressable>
-        ) : null}
-        <Text style={[styles.note, { color: c.muted }]}>Partida e avaliações do motor: transmissão oficial no Lichess.</Text>
+        <Text style={[styles.note, { color: c.muted }]}>{credit}</Text>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  empty: { flex: 1, alignItems: 'center', gap: 12 },
-  emptyTxt: { fontFamily: font.regular, fontSize: 15 },
+  empty: { flex: 1, alignItems: 'center', gap: 12, paddingHorizontal: 24 },
+  emptyTxt: { fontFamily: font.regular, fontSize: 15, textAlign: 'center' },
   link: { fontFamily: font.semibold, fontSize: 15 },
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   barBtn: { flexDirection: 'row', alignItems: 'center' },
@@ -127,12 +134,6 @@ const styles = StyleSheet.create({
   fact: { flexGrow: 1, minWidth: '45%', borderRadius: radius.md, padding: 12, gap: 2, borderWidth: StyleSheet.hairlineWidth },
   factVal: { fontFamily: font.black, fontSize: 19, letterSpacing: -0.4 },
   factLbl: { fontFamily: font.medium, fontSize: 11.5 },
-  block: { borderRadius: radius.lg, padding: 16, gap: 10, borderWidth: StyleSheet.hairlineWidth },
   blockLabel: { fontFamily: font.bold, fontSize: 11, letterSpacing: 1.2 },
-  moves: { fontFamily: font.regular, fontSize: 14, lineHeight: 22 },
-  movesHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  toggle: { fontFamily: font.semibold, fontSize: 13 },
-  cta: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.md, padding: 14, borderWidth: StyleSheet.hairlineWidth },
-  ctaTxt: { fontFamily: font.semibold, fontSize: 15 },
-  note: { fontFamily: font.regular, fontSize: 12, textAlign: 'center' },
+  note: { fontFamily: font.regular, fontSize: 12, lineHeight: 17, textAlign: 'center' },
 });

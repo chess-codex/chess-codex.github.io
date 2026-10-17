@@ -6,7 +6,7 @@ import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View
 import { GameCard } from '@/components/GameCard';
 import { MicroCard, NewsCard, ScreenHeader, SectionTitle } from '@/components/ui';
 import type { MicroArticle } from '@/data/edition';
-import { useGames } from '@/lib/games';
+import { useGames, useGamesHeading } from '@/lib/games';
 import { useStore } from '@/lib/store';
 import { font, radius, usePalette } from '@/lib/theme';
 import { longDate, timeAgo } from '@/lib/time';
@@ -25,6 +25,8 @@ export default function Today() {
   const { highlights, news } = useToday();
   // só as partidas de destaque; a que veio só por causa de uma notícia aparece dentro dela
   const games = useGames().filter((g) => !g.linked).slice(0, 12);
+  // "Partidas do dia" só quando são do dia; dia sem rodada forte ou busca falhando = "recentes"
+  const gamesHeading = useGamesHeading(games);
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
   // largura real do carrossel: na web a coluna tem teto (760), menor que a janela
@@ -135,7 +137,7 @@ export default function Today() {
 
       {games.length ? (
         <>
-          <SectionTitle>Partidas do dia</SectionTitle>
+          <SectionTitle>{gamesHeading}</SectionTitle>
           <FlatList
             horizontal
             data={games}

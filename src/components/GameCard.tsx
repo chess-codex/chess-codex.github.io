@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { fmtEval, keyTitle, moveLabel, resultLabel, type Game } from '@/lib/games';
+import { fmtEval, gameDay, keyTitle, moveLabel, resultLabel, type Game } from '@/lib/games';
 import { useResultHidden } from '@/lib/spoiler';
 import { useStore } from '@/lib/store';
 import { font, radius, usePalette } from '@/lib/theme';
@@ -23,6 +23,8 @@ export const GameCard = memo(function GameCard({ game }: { game: Game }) {
     for (let i = 0; i < game.keyPly; i++) mv = ch.move(game.moves[i]);
     return { fen: ch.fen(), last: mv ? { from: mv.from, to: mv.to } : null };
   }, [game]);
+  // "hoje", "ontem", "14 out": pelo início da rodada, não pela tag Date do PGN
+  const day = gameDay(game);
 
   return (
     <Pressable
@@ -41,8 +43,10 @@ export const GameCard = memo(function GameCard({ game }: { game: Game }) {
         <Text style={[styles.meta, { color: c.muted }]} numberOfLines={1}>
           {hideResult ? game.round : `${resultLabel(game)} · ${game.round}`}
         </Text>
-        {/* torneio embaixo da rodada, sem o parêntese de cidade/ano para caber no cartão */}
+        {/* torneio embaixo da rodada, sem o parêntese de cidade/ano para caber no cartão; a data
+            vem na frente porque a linha da rodada já é estreita e o nome do torneio é que pode cortar */}
         <Text style={[styles.event, { color: c.muted }]} numberOfLines={2}>
+          {day ? <Text style={[styles.day, { color: c.inkSoft }]}>{`${day} · `}</Text> : null}
           {game.event.replace(/\s*\([^)]*\)/, '')}
         </Text>
         <Text style={[styles.key, { color: c.inkSoft }]} numberOfLines={2}>
@@ -62,5 +66,6 @@ const styles = StyleSheet.create({
   players: { fontFamily: font.bold, fontSize: 14.5 },
   meta: { fontFamily: font.medium, fontSize: 12, marginTop: 2 },
   event: { fontFamily: font.regular, fontSize: 11.5, lineHeight: 15 },
+  day: { fontFamily: font.semibold },
   key: { fontFamily: font.regular, fontSize: 12.5, lineHeight: 17 },
 });

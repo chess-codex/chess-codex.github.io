@@ -37,6 +37,9 @@ export async function fetchTop(list = 'open', n = 10) {
       id: `${list}-${last.toLowerCase().replace(/[^a-z]/g, '')}`,
       name,
       aliases: eastern ? [name, `${first} ${last}`] : aliases(first, last),
+      // sobrenome como no PGN das transmissões ("So", "Praggnanandhaa", "Vachier-Lagrave"): o último
+      // apelido às vezes é o nome inteiro ou um apelido ("Wesley So", "Pragg")
+      surname: last,
       rank: Number(cells[0]),
       country: cells[2],
       rating: Number(cells[3]),

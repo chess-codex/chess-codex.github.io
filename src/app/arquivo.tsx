@@ -12,7 +12,8 @@ import { longDate } from '@/lib/time';
 
 // Formato de arquivo.json (gerado pelo robô em scripts/archive.mjs)
 type Entry = { title: string; text?: string; summary?: string; kicker?: string; url: string; source: string; image: string | null };
-type GameEntry = { white: string; black: string; result: string; round: string; event: string; url: string };
+// key: dias gravados antes do partidas.json não têm, e a partida fica só como texto
+type GameEntry = { key?: string; white: string; black: string; result: string; round: string; event: string; url: string };
 type Day = { date: string; stories: Entry[]; news: Entry[]; games: GameEntry[] };
 
 /** Edições anteriores: um resumo de cada dia, com link para a fonte original. */
@@ -89,13 +90,25 @@ export default function Arquivo() {
                   {d.games.length ? (
                     <View style={{ gap: 6 }}>
                       <Text style={[styles.label, { color: c.whisky }]}>PARTIDAS DO DIA</Text>
-                      {d.games.map((g) => (
-                        <Pressable key={g.url || `${g.white}-${g.black}`} onPress={() => g.url && openExternal(g.url)}>
-                          <Text style={[styles.rowText, { color: c.inkSoft }]}>
-                            {g.white} × {g.black} · {g.result.replace('1/2-1/2', '½–½')} · {g.round}
-                          </Text>
-                        </Pressable>
-                      ))}
+                      {d.games.map((g) => {
+                        const line = `${g.white} × ${g.black} · ${g.result.replace('1/2-1/2', '½–½')} · ${g.round}`;
+                        const id = g.key || g.url || `${g.white}-${g.black}`;
+                        // a partida abre na página do próprio app (partidas.json), não no site da transmissão
+                        const key = g.key;
+                        return key ? (
+                          <Pressable
+                            key={id}
+                            onPress={() => router.push({ pathname: '/game/[key]', params: { key } })}
+                            style={styles.gameRow}
+                            accessibilityRole="button"
+                          >
+                            <Text style={[styles.rowText, styles.gameTxt, { color: c.accent }]}>{line}</Text>
+                            <Ionicons name="chevron-forward" size={14} color={c.accent} />
+                          </Pressable>
+                        ) : (
+                          <Text key={id} style={[styles.rowText, { color: c.inkSoft }]}>{line}</Text>
+                        );
+                      })}
                     </View>
                   ) : null}
                 </View>
@@ -123,5 +136,7 @@ const styles = StyleSheet.create({
   rowTitle: { fontFamily: font.semibold, fontSize: 15, lineHeight: 20 },
   rowText: { fontFamily: font.regular, fontSize: 13.5, lineHeight: 19 },
   rowSrc: { fontFamily: font.medium, fontSize: 12 },
+  gameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  gameTxt: { flexShrink: 1 },
   label: { fontFamily: font.bold, fontSize: 11, letterSpacing: 1.2 },
 });
