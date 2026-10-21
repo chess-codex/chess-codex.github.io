@@ -96,22 +96,58 @@ export async function createEngine({ depth = 14 } = {}) {
   };
   await start();
 
+  // Antes de cada busca: o motor confirma que terminou tudo o que veio antes (isready → readyok).
+  // Sem isso, uma resposta atrasada da busca anterior podia virar a avaliação da posição seguinte
+  // (pranav-giri: −2,3 depois de 1.e4, e o 1…e6 saiu como "erro decisivo")
+  async function sync() {
+    send('isready');
+    await waitFor((l) => l === 'readyok', 20000);
+  }
+
+  // Espera o fim da busca. Se passar do prazo, manda parar e espera o bestmove dela: o readyok vem
+  // mesmo com a busca rodando, então sem isso ela continuaria e responderia por cima da próxima
+  async function finish() {
+    try {
+      await waitFor((l) => l.startsWith('bestmove'));
+    } catch (e) {
+      if (alive) {
+        send('stop');
+        await waitFor((l) => l.startsWith('bestmove'), 5000).catch(() => {});
+      }
+      throw e;
+    }
+  }
+
+  /** Partida nova: zera a memória do motor (tabela de transposição e históricos da partida anterior). */
+  async function newGame() {
+    await ready();
+    send('ucinewgame');
+    await sync();
+  }
+
   /** Avaliação em peões do ponto de vista das brancas (mate = ±20). */
   async function evaluate(fen) {
     const pos = new Chess(fen);
     if (pos.isCheckmate()) return pos.turn() === 'w' ? -MATE : MATE;
     if (pos.isStalemate() || pos.isInsufficientMaterial()) return 0;
     await ready();
+    await sync();
+    // só a avaliação exata da maior profundidade: linha com lowerbound/upperbound é provisória
     let score = null;
+    let best = -1;
     const collect = (line) => {
-      const m = line.match(/^info .*? score (cp|mate) (-?\d+)/);
-      if (m && !/ multipv [2-9]/.test(line)) score = m[1] === 'mate' ? (Number(m[2]) > 0 ? MATE : -MATE) : Number(m[2]) / 100;
+      const m = line.match(/^info .*?\bdepth (\d+)\b.*? score (cp|mate) (-?\d+)/);
+      if (!m || / multipv [2-9]/.test(line) || / (lower|upper)bound/.test(line)) return;
+      const dep = Number(m[1]);
+      if (dep < best) return;
+      best = dep;
+      score = m[2] === 'mate' ? (Number(m[3]) > 0 ? MATE : -MATE) : Number(m[3]) / 100;
     };
     listeners.add(collect);
     send(`position fen ${fen}`);
     send(`go depth ${depth}`);
     try {
-      await waitFor((l) => l.startsWith('bestmove'));
+      await finish();
     } finally {
       listeners.delete(collect);
     }
@@ -131,6 +167,7 @@ export async function createEngine({ depth = 14 } = {}) {
     if (pos.isCheckmate()) return { score: pos.turn() === 'w' ? -MATE : MATE, mateIn: 0, bestmove: null, pv: [], lines: [] };
     if (pos.isStalemate() || pos.isInsufficientMaterial()) return { score: 0, mateIn: null, bestmove: null, pv: [], lines: [] };
     await ready();
+    await sync();
     const sign = pos.turn() === 'w' ? 1 : -1;
     const lines = new Map(); // multipv → última linha exata (sem lowerbound/upperbound)
     const collect = (line) => {
@@ -145,7 +182,7 @@ export async function createEngine({ depth = 14 } = {}) {
     send(`position fen ${fen}`);
     send(`go depth ${d}${movetime ? ` movetime ${movetime}` : ''}`);
     try {
-      await waitFor((l) => l.startsWith('bestmove'));
+      await finish();
     } finally {
       listeners.delete(collect);
       // volta ao normal: evaluate() e as próximas buscas rodam com uma linha só
@@ -165,6 +202,7 @@ export async function createEngine({ depth = 14 } = {}) {
   }
 
   return {
+    newGame,
     evaluate,
     analyse,
     quit() {

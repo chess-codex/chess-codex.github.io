@@ -18,7 +18,7 @@ import { fetchOgImage, notPhoto, parseSource } from '../src/lib/rss.ts';
 import { CHECK_PROMPT, CHECK_RULES, GLOSSARY } from './prompts.mjs';
 import { copiedRun, essentials, feedOverlap, fetchArticle, fixSpelling, hasQuote, isPortuguese, notPortuguese, parseChecks, sentences } from './articles.mjs';
 import { fetchTop } from './fide.mjs';
-import { fetchRecentGames, linkGame, staleGames } from './games.mjs';
+import { fetchRecentGames, linkGame, refreshArchived, staleGames } from './games.mjs';
 import { channelOf, fetchYouTube } from './youtube.mjs';
 
 const OUT = new URL('../src/data/digest.json', import.meta.url);
@@ -672,6 +672,14 @@ try {
   const updatedAt = prev.gamesInfo?.updatedAt ?? kept.newest ?? prev.generatedAt ?? new Date().toISOString();
   gamesInfo = { mode: kept.mode, stale: true, updatedAt };
   console.log(`partidas: mantidas de ${updatedAt} (${games.length} em destaque${kept.dropped ? `, ${kept.dropped} com mais de 72 h fora` : ''})`);
+}
+
+// 5a) Partidas antigas do arquivo com análise de versão anterior são refeitas aos poucos (até 90 s
+// por execução, as mais recentes primeiro); o archive.mjs publica o partidas.json corrigido
+try {
+  await refreshArchived(90_000);
+} catch (e) {
+  console.warn(`arquivo de partidas: ${errText(e)}`);
 }
 
 // 5b) Liga a partida também às notícias avulsas das Notícias do dia (as histórias são ligadas mais

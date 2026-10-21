@@ -109,12 +109,18 @@ const days = [entry, ...(archive.days ?? []).filter((d) => d.date !== today)]
 // Chave repetida (mesmos sobrenomes e rodada em outro torneio) fica com a partida mais nova.
 const cutoff = new Date(Date.now() - 3 * 3600 * 1000 - DAYS * 86400 * 1000).toISOString().slice(0, 10);
 const partidas = {};
+// entre a cópia do cache e a do site vale a análise mais nova (o robô reanalisa o arquivo com
+// refreshArchived); com a mesma versão, a vista por último
+const newer = (a, b) => (Number(a.analysis) || 0) - (Number(b.analysis) || 0) || String(a.seen ?? '').localeCompare(String(b.seen ?? ''));
 for (const src of [readJson(GAMES_CACHE), readJson(GAMES_OUT)]) {
   if (!src || typeof src !== 'object' || Array.isArray(src)) continue;
   for (const [key, g] of Object.entries(src)) {
-    if (g && typeof g === 'object' && Array.isArray(g.moves) && (!partidas[key] || (g.seen ?? '') >= (partidas[key].seen ?? ''))) partidas[key] = g;
+    if (!g || typeof g !== 'object' || (!Array.isArray(g.moves) && !g.none)) continue;
+    if (!partidas[key] || newer(g, partidas[key]) >= 0) partidas[key] = g;
   }
 }
+// partida que a análise certa mostrou sem momento decisivo sai do arquivo (o "erro" antigo era falso)
+for (const [key, g] of Object.entries(partidas)) if (g.none) delete partidas[key];
 let added = 0;
 for (const g of digest.games ?? []) {
   if (!g?.key || !Array.isArray(g.moves) || !Array.isArray(g.evals)) continue;

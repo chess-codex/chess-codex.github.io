@@ -449,7 +449,25 @@ const ENGINE_CACHE = new URL('engine.json', CACHE_DIR);
 const ENGINE_CACHE_MAX = 400;
 // Versão da análise: entrada do cache (ou do digest anterior) com outra versão é refeita.
 // 2: ponto sem volta pela chance de vitória, melhor lance, refutação, alternativas, fase, precisão
-const ANALYSIS = 2;
+// 3: motor zerado a cada partida e sincronizado a cada busca; avaliação suspeita refeita na funda
+//    (a 2 publicou números trocados: pranav-giri com −2,3 depois de 1.e4 e "erro" em 1…e6)
+const ANALYSIS = 3;
+const MAX_SUSPECTS = 8; // posições suspeitas refeitas por partida (cada uma ~1 s na profundidade 16)
+
+/**
+ * Lances cuja avaliação não parece real: o 1º lance longe do equilíbrio, ou um pico de um lance só
+ * que some no lance seguinte (A → B → A). Não conta mate dos dois lados (±20 seguidos é real).
+ */
+function suspects(ev) {
+  const out = [];
+  if (ev.length && Math.abs(ev[0]) > 1) out.push(0);
+  for (let i = 1; i < ev.length - 1; i++) {
+    const jump = Math.abs(ev[i] - ev[i - 1]);
+    const back = Math.abs(ev[i + 1] - ev[i - 1]);
+    if (jump >= 1.5 && back < 0.6 && Math.abs(ev[i - 1]) < MATE) out.push(i);
+  }
+  return out.slice(0, MAX_SUSPECTS);
+}
 const ALT_MS = 3000; // teto do MultiPV 3 no desafio (sem teto, uma busca com 3 linhas levou 60 s)
 const DEEP_PASSES = 3; // voltas da análise funda até o lance decisivo parar de mudar
 // Teto do Stockfish por execução. A 1ª execução depois de mudar ANALYSIS refaz o cache inteiro
@@ -519,6 +537,74 @@ async function deepAnalysis(g, fens, ev, k, engine) {
   };
 }
 
+/** Análise completa de uma partida (campos de ANALYSIS_FIELDS, sem engine/analysis); null se não houver momento decisivo. */
+async function analyseGame(g, engine) {
+  const ch = new Chess();
+  const fens = [ch.fen()];
+  for (const m of g.moves) {
+    ch.move(m);
+    fens.push(ch.fen());
+  }
+  await engine.newGame();
+  const ev = [];
+  for (let i = 1; i < fens.length; i++) ev.push((await engine.evaluate(fens[i])) ?? ev[i - 2] ?? 0.2);
+  // número suspeito não vira "erro decisivo" sem confirmação na análise funda
+  for (const i of suspects(ev)) {
+    const a = await engine.analyse(fens[i + 1], { depth: KEY_DEPTH });
+    if (a.score != null) ev[i] = a.score;
+  }
+  const k = keyMoment(ev, g.result);
+  return k ? deepAnalysis(g, fens, ev, k, engine) : null;
+}
+
+/**
+ * Refaz a análise das partidas antigas do arquivo (src/data/partidas.json, restaurado do site) que
+ * ainda estão numa versão anterior, as mais recentes primeiro, até o tempo acabar. O archive.mjs
+ * publica o arquivo de volta. Sem isso, a partida que já saiu do digest (ex.: pranav-giri) ficaria
+ * para sempre com a análise errada.
+ */
+export async function refreshArchived(budgetMs = 90_000) {
+  const file = new URL('../src/data/partidas.json', import.meta.url);
+  let saved;
+  try {
+    saved = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return 0;
+  }
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return 0;
+  const todo = Object.entries(saved)
+    .filter(([, g]) => g && Array.isArray(g.moves) && g.analysis !== ANALYSIS)
+    .sort((a, b) => String(b[1].seen ?? '').localeCompare(String(a[1].seen ?? '')));
+  if (!todo.length) return 0;
+  const engine = await createEngine({ depth: ENGINE_DEPTH });
+  const t0 = Date.now();
+  let done = 0;
+  try {
+    for (const [key, g] of todo) {
+      if (Date.now() - t0 > budgetMs) break;
+      try {
+        const a = await analyseGame(g, engine);
+        if (a) {
+          // relógio do lance decisivo: o arquivo não guarda os relógios lance a lance
+          saved[key] = { ...g, ...a, keyClock: a.keyPly === g.keyPly ? g.keyClock ?? null : null, engine: 'Stockfish 19', analysis: ANALYSIS };
+        } else {
+          // sem momento decisivo na análise certa: o "erro" antigo não pode continuar publicado.
+          // O archive.mjs tira do partidas.json a entrada marcada com none (o app diz "não encontrada")
+          saved[key] = { key, none: true, analysis: ANALYSIS, seen: g.seen };
+        }
+        done++;
+      } catch (e) {
+        console.warn(`  arquivo: Stockfish falhou em ${key}: ${e.message}`);
+      }
+    }
+  } finally {
+    engine.quit();
+  }
+  writeFileSync(file, JSON.stringify(saved));
+  console.log(`arquivo de partidas: ${done} reanalisadas, ${todo.length - done} ficam para a próxima`);
+  return done;
+}
+
 /**
  * Reavalia as partidas com o nosso Stockfish e recalcula o momento decisivo.
  * Partida que já foi analisada numa execução anterior (mesmos lances, mesma versão) reaproveita o resultado.
@@ -575,16 +661,7 @@ export async function analyzeWithEngine(games) {
       // "sem momento decisivo" também vai para o cache (a partida é igual na próxima execução)
       const none = () => touch(g.key, { key: g.key, plies: g.moves.length, none: true, analysis: ANALYSIS });
       try {
-        const ch = new Chess();
-        const fens = [ch.fen()];
-        for (const m of g.moves) {
-          ch.move(m);
-          fens.push(ch.fen());
-        }
-        const ev = [];
-        for (let i = 1; i < fens.length; i++) ev.push((await engine.evaluate(fens[i])) ?? ev[i - 2] ?? 0.2);
-        const k = keyMoment(ev, g.result);
-        const a = k && (await deepAnalysis(g, fens, ev, k, engine));
+        const a = await analyseGame(g, engine);
         if (!a) {
           none();
           continue;
